@@ -1,0 +1,19 @@
+{
+  "name": "watchtogether-signaling",
+  "version": "0.1.0",
+  "description": "Minimal WebRTC signaling relay for WatchTogether",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test-e2e.mjs && node test-nextep.mjs",
+    "test:e2e": "node test-e2e.mjs",
+    "test:nextep": "node test-nextep.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "node-datachannel": "^0.32.3"
+  }
+}
