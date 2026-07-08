@@ -57,7 +57,29 @@ $('tutDone').onclick = hideTut;
 try { if (!localStorage.getItem('wt-tut')) setTimeout(showTut, 500); } catch {}
 
 // ---- Select Video (hangi sekmedeki video) ----
-function requestTabs() { toParent('list-tabs'); }
+let targetTabId = null;
+function bgSend(msg, cb) {
+  try { if (chrome?.runtime?.sendMessage) { chrome.runtime.sendMessage({ wt: true, ...msg }, (r) => { void chrome.runtime.lastError; cb && cb(r); }); return true; } } catch {}
+  return false;
+}
+function requestTabs() {
+  // Panel bir eklenti sayfası → chrome.tabs'e DOĞRUDAN erişebilir (röleye gerek yok)
+  try {
+    if (chrome?.tabs?.query) {
+      chrome.tabs.query({}, (all) => {
+        if (chrome.runtime.lastError || !all) { toParent('list-tabs'); return; }
+        chrome.tabs.query({ active: true, lastFocusedWindow: true }, (act) => {
+          const current = act && act[0] ? act[0].id : null;
+          const list = all.filter((t) => t.id != null && /^https?:/.test(t.url || ''))
+            .map((t) => ({ id: t.id, title: t.title || t.url, url: t.url }));
+          populateTabs(list, current, targetTabId);
+        });
+      });
+      return;
+    }
+  } catch {}
+  toParent('list-tabs');   // yedek: content-panel üzerinden
+}
 function populateTabs(tabs, current, target) {
   tabsCache = tabs || [];
   const sel = $('videoSelect'), prev = sel.value;
@@ -76,7 +98,9 @@ $('videoSelect').addEventListener('focus', requestTabs);
 $('tabRefresh').onclick = requestTabs;
 $('videoSelect').onchange = () => {
   const v = $('videoSelect').value;
-  toParent('set-target', { tabId: v ? Number(v) : null });
+  targetTabId = v ? Number(v) : null;
+  // Hedefi doğrudan background'a bildir (content-panel eski olsa bile çalışsın), yedek röle
+  if (!bgSend({ kind: 'set-target', tabId: targetTabId })) toParent('set-target', { tabId: targetTabId });
   if (v) { const t = tabsCache.find((x) => String(x.id) === v); if (t) { pageUrl = t.url; addSys('Video kaynağı: ' + (t.title || t.url).slice(0, 40)); } }
   else { pageUrl = ownUrl; addSys('Video kaynağı: bu sekme'); }
   setTimeout(() => toParent('video-query'), 200);
