@@ -1,0 +1,12 @@
+# Render.com blueprint — WatchTogether signaling (WebSocket relay).
+# Kurulum: https://dashboard.render.com → New → Blueprint → bu repo'yu seç.
+# Render PORT'u otomatik verir; sunucu process.env.PORT kullanır. WebSocket + wss destekli.
+services:
+  - type: web
+    name: watchtogether-signaling
+    runtime: node
+    rootDir: signaling
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /

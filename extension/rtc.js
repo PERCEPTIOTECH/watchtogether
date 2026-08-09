@@ -35,6 +35,7 @@ export class Mesh {
     this.room = null;
     this.name = 'Misafir';
     this.ws = null;
+    this.signalUrl = null;       // panelden ayarlanır; boşsa SIGNAL_URL (localhost)
     this.localStream = null;
     this.peers = new Map();   // peerId -> { pc, dc, name, polite, makingOffer, ignoreOffer }
 
@@ -77,7 +78,7 @@ export class Mesh {
     this.room = room;
     this.name = name || 'Misafir';
     this.onStatus('bağlanıyor…');
-    const ws = new WebSocket(SIGNAL_URL);
+    const ws = new WebSocket(this.signalUrl || SIGNAL_URL);
     this.ws = ws;
 
     ws.onopen = () => {

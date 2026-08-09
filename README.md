@@ -29,8 +29,14 @@ cd signaling
 npm install
 npm start          # ws://localhost:8080
 ```
-Ücretsiz yayına almak için: Render / Fly.io / Deno Deploy free tier. Sonra
-`extension/rtc.js` içindeki `SIGNAL_URL`'i o adrese çevir (wss://...).
+### Public wss'e alma (arkadaşınla internet üzerinden)
+Repo'da `render.yaml` var. **Render** ile tek tık:
+1. https://dashboard.render.com → **New → Blueprint** → bu repo'yu seç → Apply
+2. Deploy bitince URL'i al: `https://watchtogether-signaling-xxxx.onrender.com`
+3. Eklenti panelinde **Sunucu ayarı (gelişmiş)** alanına `wss://watchtogether-signaling-xxxx.onrender.com` yaz (http→wss).
+
+Artık kodu düzenlemeye gerek yok — adres `chrome.storage`'da saklanır. (Render free tier
+15 dk boştan sonra uyur; ilk bağlantı ~30 sn sürebilir.)
 
 ### 1b) Headless test botu (tarayıcısız uçtan uca doğrulama)
 ```

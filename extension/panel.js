@@ -56,6 +56,20 @@ $('tutX').onclick = hideTut;
 $('tutDone').onclick = hideTut;
 try { if (!localStorage.getItem('wt-tut')) setTimeout(showTut, 500); } catch {}
 
+// ---- Signaling sunucu adresi (deploy sonrası panelden ayarlanır) ----
+try {
+  chrome?.storage?.local?.get?.('wt-signal', (r) => {
+    const u = r && r['wt-signal'];
+    if (u) { mesh.signalUrl = u; if ($('signalInput')) $('signalInput').value = u; }
+  });
+} catch {}
+$('signalInput')?.addEventListener('change', () => {
+  const u = $('signalInput').value.trim();
+  mesh.signalUrl = u || null;
+  try { chrome?.storage?.local?.set?.({ 'wt-signal': u }); } catch {}
+  addSys(u ? ('Sunucu ayarlandı: ' + u) : 'Sunucu: localhost');
+});
+
 // ---- Select Video (hangi sekmedeki video) ----
 let targetTabId = null;
 function bgSend(msg, cb) {

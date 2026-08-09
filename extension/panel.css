@@ -191,3 +191,11 @@ input[type=text]:focus { outline: none; border-color: var(--accent); }
 .tut-steps li { font-size: 12.5px; line-height: 1.5; color: var(--fg); }
 .tut-steps li b { font-weight: 600; }
 .tut-steps::marker { color: var(--accent); }
+
+/* Gelişmiş (sunucu ayarı) */
+.advanced { margin-top: 2px; }
+.advanced summary { font-size: 11.5px; color: var(--muted); cursor: pointer; padding: 4px 0; list-style: none; }
+.advanced summary::-webkit-details-marker { display: none; }
+.advanced summary::before { content: "▸ "; }
+.advanced[open] summary::before { content: "▾ "; }
+.advanced input { width: 100%; margin-top: 8px; font-size: 12px; }
