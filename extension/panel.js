@@ -57,11 +57,14 @@ $('tutX').onclick = hideTut;
 $('tutDone').onclick = hideTut;
 try { if (!localStorage.getItem('wt-tut')) setTimeout(showTut, 500); } catch {}
 
-// ---- Signaling sunucu adresi (deploy sonrası panelden ayarlanır) ----
+// ---- Signaling sunucu adresi ----
+const DEFAULT_SIGNAL = 'wss://watchtogether-signaling.onrender.com';   // deploy edilen sunucu (varsayılan)
+mesh.signalUrl = DEFAULT_SIGNAL;
 try {
   chrome?.storage?.local?.get?.('wt-signal', (r) => {
-    const u = r && r['wt-signal'];
-    if (u) { mesh.signalUrl = u; if ($('signalInput')) $('signalInput').value = u; }
+    const u = (r && r['wt-signal']) || DEFAULT_SIGNAL;   // kaydedilmiş varsa onu, yoksa varsayılanı
+    mesh.signalUrl = u;
+    if ($('signalInput')) $('signalInput').value = u;
   });
 } catch {}
 $('signalInput')?.addEventListener('change', () => {
