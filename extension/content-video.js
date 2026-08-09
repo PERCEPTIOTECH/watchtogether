@@ -19,25 +19,32 @@
     return acc;
   }
 
-  // Sayfadaki en "önemli" videoyu seç (en büyük görünen ve/veya oynayan).
+  // Video puanı: OYNAYAN >> görünür >> alan. Böylece durmuş/gizli kopyalara takılmayız.
+  function scoreVideo(v) {
+    const r = v.getBoundingClientRect();
+    const area = Math.max(0, r.width) * Math.max(0, r.height);
+    const visible = r.width > 4 && r.height > 4 && r.bottom > 0 && r.top < (innerHeight || 800);
+    const playing = !v.paused && !v.ended && v.readyState > 2;
+    const hasTime = v.duration > 0 && isFinite(v.duration);
+    return (playing ? 1e12 : 0) + (visible ? 1e9 : 0) + (hasTime ? 1e6 : 0) + area;
+  }
   function pickVideo() {
     const vids = allVideos();
     if (!vids.length) return null;
-    let best = null, bestScore = -1;
-    for (const v of vids) {
-      const r = v.getBoundingClientRect();
-      const area = Math.max(0, r.width) * Math.max(0, r.height);
-      const playing = !v.paused && !v.ended && v.readyState > 2 ? 1e9 : 0;
-      const score = area + playing;
-      if (score > bestScore) { bestScore = score; best = v; }
-    }
-    return best;
+    return vids.reduce((a, b) => (scoreVideo(b) > scoreVideo(a) ? b : a));
   }
 
+  // Her çağrıda en iyi (oynayan/görünür) videoya geç — YouTube mini-player gibi
+  // durumlarda durmuş eski elemente kilitlenmeyi önler.
   function ensureVideo() {
-    if (video && document.contains(video)) return video;
-    video = pickVideo();
-    if (video && !video.__wtHooked) hookVideo(video);
+    const best = pickVideo();
+    if (best && best !== video) {
+      // Yalnızca gerçekten daha iyiyse geç (oynayan/görünür), gereksiz zıplama olmasın
+      if (!video || !document.contains(video) || scoreVideo(best) > scoreVideo(video)) {
+        video = best;
+        if (!video.__wtHooked) hookVideo(video);
+      }
+    }
     return video;
   }
 
@@ -48,21 +55,28 @@
   function hookVideo(v) {
     v.__wtHooked = true;
     const emit = (type) => () => {
-      if (applyingRemote) return;
+      if (applyingRemote || v !== video) return;   // yalnızca seçili video raporlar
       report({ type, time: v.currentTime, rate: v.playbackRate, dur: v.duration });
     };
     v.addEventListener('play', emit('play'));
     v.addEventListener('pause', emit('pause'));
     v.addEventListener('seeked', emit('seek'));
     v.addEventListener('ratechange', emit('rate'));
-    // Bazı özel oynatıcılar 'seeked' tetiklemez → timeupdate'te ani sıçramayı seek say
-    let lastT = v.currentTime;
+    // timeupdate: (a) ani sıçramayı seek say, (b) ~500ms'de bir GERÇEK durumu it
+    // → panel bar'ı hep videoyla aynı kalır + host daha sık heartbeat yollar.
+    let lastT = v.currentTime, lastPush = 0;
     v.addEventListener('timeupdate', () => {
+      if (v !== video) return;
       if (applyingRemote) { lastT = v.currentTime; return; }
       if (Math.abs(v.currentTime - lastT) > 1.5) {
         report({ type: 'seek', time: v.currentTime, rate: v.playbackRate, dur: v.duration });
       }
       lastT = v.currentTime;
+      const now = Date.now();
+      if (now - lastPush > 500) {
+        lastPush = now;
+        report({ type: v.paused ? 'pause' : 'play', time: v.currentTime, rate: v.playbackRate, dur: v.duration, query: true });
+      }
     });
   }
 
