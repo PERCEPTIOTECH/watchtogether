@@ -136,13 +136,31 @@ $('videoSelect').onchange = () => {
 // ---- Otomatik katılma ----
 function maybeAutoJoin(session) {
   if (autoTried || joined) return;
+  // 1) Sayfa oturumu (aynı sekme) → sessizce yeniden katıl
   if (session && session.room) {
-    autoTried = true; $('nameInput').value = session.name || '';
-    startRoom(session.room, { creator: !!session.creator, silent: true, token: session.token });
+    autoTried = true;
+    startRoom(session.room, { creator: !!session.creator, silent: true, token: session.token, name: session.name });
     return;
   }
+  // 2) Davet linki (#wt-join) → eklenti deposunda isim varsa SORMADAN katıl, yoksa isim iste
   const match = /wt-join=([A-Z0-9]+)/i.exec((pageUrl.split('#')[1]) || '');
-  if (match) { autoTried = true; enterJoinMode(match[1].toUpperCase()); }
+  if (!match) return;
+  const hashRoom = match[1].toUpperCase();
+  autoTried = true;
+  let handled = false;
+  try {
+    if (chrome?.storage?.local?.get) {
+      handled = true;
+      chrome.storage.local.get('wt-last', (r) => {
+        const last = (r && r['wt-last']) || null;
+        if (last && last.name) {
+          const sameRoom = last.room === hashRoom;   // aynı oda → host token'ıyla reclaim
+          startRoom(hashRoom, { creator: sameRoom && !!last.creator, token: sameRoom ? last.token : null, silent: true, name: last.name });
+        } else enterJoinMode(hashRoom);
+      });
+    }
+  } catch {}
+  if (!handled) enterJoinMode(hashRoom);
 }
 function enterJoinMode(code) {
   document.querySelector('.hero-title').textContent = 'Odaya katıl';
@@ -208,10 +226,15 @@ $('createBtn').onclick = () => startRoom(Mesh.newRoom(), { creator: true });
 $('joinBtn').onclick = () => { const c = $('roomInput').value.trim().toUpperCase(); if (c) startRoom(c, { creator: false }); };
 $('roomInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('joinBtn').click(); });
 
+function saveIdentity() {
+  try { chrome?.storage?.local?.set?.({ 'wt-last': { room: curRoom, name: curName, creator: isCreator, token: mesh.hostToken } }); } catch {}
+}
 async function startRoom(room, opts = {}) {
-  const name = $('nameInput').value.trim() || 'Misafir';
+  const name = (opts.name || $('nameInput').value.trim() || 'Misafir');
+  $('nameInput').value = name;
   isCreator = !!opts.creator; curRoom = room; curName = name;
   mesh.hostToken = opts.token || null;      // token varsa host'luğu geri al (sayfa değişimi)
+  saveIdentity();                            // ismi/odayı/token'ı eklenti deposuna sakla
   roster.set('self', { name, mic: micOn, cam: camOn });
   wireMesh();
   await initMedia();
@@ -246,7 +269,7 @@ function wireMesh() {
   // Sunucu host'u belirledi/değiştirdi → UI tazele
   mesh.onHost = () => { updateControlUI(); renderUsers(); };
   // Sunucu bana host token verdi → oturuma kaydet (sayfa değişince reclaim)
-  mesh.onHostToken = (tok) => toParent('session-active', { on: true, room: curRoom, name: curName, creator: isCreator, token: tok });
+  mesh.onHostToken = (tok) => { toParent('session-active', { on: true, room: curRoom, name: curName, creator: isCreator, token: tok }); saveIdentity(); };
   mesh.onPeer = (id, name) => {
     const r = roster.get(id) || { mic: true, cam: true }; r.name = name; roster.set(id, r);
     renderUsers(); renderName(id, name);
