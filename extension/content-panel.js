@@ -122,6 +122,15 @@
     if (iframe) iframe.contentWindow.postMessage({ wt: true, kind: 'page-url', url: location.href, session: readSession() }, '*');
   }
 
+  // SPA URL değişimini yakala (YouTube gibi siteler sayfayı yenilemeden video değiştirir)
+  let lastUrl = location.href;
+  function checkUrl() {
+    if (location.href !== lastUrl) { lastUrl = location.href; sendPageUrl(); }
+  }
+  setInterval(checkUrl, 1000);
+  window.addEventListener('popstate', checkUrl);
+  window.addEventListener('hashchange', checkUrl);
+
   // Davet linkiyle gelindiyse VEYA bu sekmede aktif bir oturum varsa (bölüm değişimi) paneli aç
   if (location.hash.includes('wt-join=') || readSession()) toggle(true);
 })();

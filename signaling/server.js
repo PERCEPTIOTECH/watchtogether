@@ -8,7 +8,7 @@ const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 
 const PORT = process.env.PORT || 8080;
-const GRACE_MS = 8000;
+const GRACE_MS = 12000;   // host'un sayfa yenileme/kısa kesinti sonrası dönmesi için pencere
 const rooms = new Map(); // roomId -> { peers:Map(peerId->ws), hostPeer, hostToken, claimed, grace }
 
 const rid = (n = 24) => crypto.randomBytes(n).toString('hex').slice(0, n);
@@ -71,7 +71,12 @@ wss.on('connection', (ws) => {
       R.grace = setTimeout(() => {                     // host token'la dönmezse en eskiyi terfi et
         R.grace = null;
         const next = R.peers.keys().next().value;
-        if (next) { R.hostPeer = next; send(R.peers.get(next), { type: 'host-token', token: R.hostToken }); broadcast(R, { type: 'host', peer: next }); }
+        if (next) {
+          R.hostToken = rid(24);                       // token'ı YENİLE → eski host geri dönüp çakışamaz
+          R.hostPeer = next;
+          send(R.peers.get(next), { type: 'host-token', token: R.hostToken });
+          broadcast(R, { type: 'host', peer: next });
+        }
       }, GRACE_MS);
     }
 

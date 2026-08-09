@@ -112,6 +112,12 @@ export class Mesh {
       const msg = JSON.parse(ev.data);
       if (msg.type === 'peers') {
         if (msg.host !== undefined) this._setHost(msg.host);
+        // Yeniden bağlanmada: sunucu listesinde OLMAYAN yerel eşleri düşür (kesinti sırasında ayrılmışlar)
+        if (this._joinedOnce) {
+          const alive = new Set(msg.peers);
+          for (const id of [...this.peers.keys()]) if (!alive.has(id)) this._dropPeer(id);
+        }
+        this._joinedOnce = true;
         for (const pid of msg.peers) this._ensurePeer(pid, true);
       } else if (msg.type === 'peer-joined') {
         if (msg.host !== undefined) this._setHost(msg.host);

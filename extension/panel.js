@@ -7,6 +7,7 @@ const mesh = new Mesh();
 let pageUrl = '', joined = false, micOn = true, camOn = true, cinemaOn = false;
 let isCreator = false, autoTried = false, curRoom = '', curName = '';
 const roster = new Map();               // key ('self'|peerId) -> {name, mic, cam}
+const grantedNames = new Set();         // host: kontrol verilen İSİMLER (F5 sonrası id değişse de korunur)
 let queue = [];
 let vstate = { time: 0, duration: 0, paused: true, at: 0 };
 let seeking = false;
@@ -38,11 +39,20 @@ const IC = {
 function toParent(kind, extra = {}) { parent.postMessage({ wt: true, source: 'panel', kind, ...extra }, '*'); }
 function videoCmd(cmd) { toParent('video-cmd', { cmd }); }
 
-let ownUrl = '', tabsCache = [];
+let ownUrl = '', tabsCache = [], targetTabId = null;
 window.addEventListener('message', (e) => {
   const m = e.data;
   if (!m || !m.wt) return;
-  if (m.kind === 'page-url') { pageUrl = m.url || ''; if (!ownUrl) ownUrl = pageUrl; maybeAutoJoin(m.session); }
+  if (m.kind === 'page-url') {
+    const url = m.url || '';
+    ownUrl = url;                                   // kendi sekmemizin güncel URL'i (SPA dahil)
+    if (targetTabId == null) {
+      const changed = pageUrl && basePage(pageUrl) !== basePage(url);
+      pageUrl = url;                                // özel kaynak seçilmediyse host bunu yayar
+      if (changed && joined && amHost()) { mesh.sendSource(basePage(pageUrl)); toParent('video-query'); }  // anında bildir
+    }
+    maybeAutoJoin(m.session);
+  }
   else if (m.kind === 'video-event') handleVideoEvent(m.event);
   else if (m.kind === 'cinema-state') { cinemaOn = m.on; $('cinemaBtn').classList.toggle('on', cinemaOn); }
   else if (m.kind === 'tabs') populateTabs(m.tabs, m.current, m.target);
@@ -75,7 +85,6 @@ $('signalInput')?.addEventListener('change', () => {
 });
 
 // ---- Select Video (hangi sekmedeki video) ----
-let targetTabId = null;
 function bgSend(msg, cb) {
   try { if (chrome?.runtime?.sendMessage) { chrome.runtime.sendMessage({ wt: true, ...msg }, (r) => { void chrome.runtime.lastError; cb && cb(r); }); return true; } } catch {}
   return false;
@@ -241,7 +250,7 @@ function wireMesh() {
   mesh.onPeer = (id, name) => {
     const r = roster.get(id) || { mic: true, cam: true }; r.name = name; roster.set(id, r);
     renderUsers(); renderName(id, name);
-    if (amHost()) { mesh.sendSource(basePage(pageUrl)); mesh.sendControl([...mesh.controllers]); }
+    if (amHost()) { mesh.sendSource(basePage(pageUrl)); recomputeControllers(); }   // isme göre yetkiyi yeniden uygula
   };
   mesh.onLeave = (id) => { roster.delete(id); mesh.controllers.delete(id); removeTile(id); analysers.delete(id); renderUsers(); addSys('Bir katılımcı ayrıldı'); };
   mesh.onStream = (id, stream) => { addTile(id, roster.get(id)?.name || 'Katılımcı', stream, false); watchSpeaking(id, stream); };
@@ -289,11 +298,17 @@ function updateControlUI() {
   const note = !mesh.hostId ? 'Host bekleniyor…' : allowed ? (amHost() ? 'Kontrol sende (host)' : 'Kontrol sende') : 'Kontrol host’ta';
   $('ctlNote').textContent = note;
 }
-function toggleGrant(rid) {
+function toggleGrant(rid, name) {
   if (!amHost()) return;
-  const c = mesh.controllers;
-  if (c.has(rid)) c.delete(rid); else c.add(rid);
-  mesh.sendControl([...c]); renderUsers(); updateControlUI();
+  if (grantedNames.has(name)) grantedNames.delete(name); else grantedNames.add(name);
+  recomputeControllers();
+}
+// Host: verilen İSİMLERE göre kontrol id listesini yeniden kur ve yayınla
+function recomputeControllers() {
+  if (!amHost()) return;
+  const ids = [];
+  for (const [key, u] of roster) { if (key === 'self') continue; if (grantedNames.has(u.name)) ids.push(realId(key)); }
+  mesh.sendControl(ids); renderUsers(); updateControlUI();
 }
 
 // ---- Katılımcı listesi ----
@@ -317,13 +332,13 @@ function renderUsers() {
     if (u.mic === false) st.insertAdjacentHTML('beforeend', `<span class="s-mute" title="Mikrofon kapalı">${IC.micOff(15)}</span>`);
     // Kontrol yetkisi göstergesi / host için ver-al düğmesi
     if (!host) {
-      const granted = mesh.controllers.has(rid);
+      const granted = amHost() ? grantedNames.has(u.name) : mesh.controllers.has(rid);
       if (amHost()) {
         const b = document.createElement('span');
         b.className = 's-ctl' + (granted ? ' granted' : '');
         b.title = granted ? 'Kontrol yetkisini al' : 'Kontrol yetkisi ver';
         b.innerHTML = IC.key(14);
-        b.onclick = () => toggleGrant(rid);
+        b.onclick = () => toggleGrant(rid, u.name);
         st.appendChild(b);
       } else if (granted) {
         st.insertAdjacentHTML('beforeend', `<span class="s-ctl granted" title="Kontrol yetkisi var">${IC.key(14)}</span>`);
@@ -500,7 +515,7 @@ $('copyLink').onclick = doInvite;
 $('leaveBtn').onclick = () => {
   mesh.leave(); joined = false; if (cinemaOn) toParent('cinema', { on: false });
   toParent('session-active', { on: false });
-  roster.clear(); mesh.controllers.clear(); mesh.hostId = null; mesh.hostToken = null; analysers.clear(); queue = [];
+  roster.clear(); mesh.controllers.clear(); grantedNames.clear(); mesh.hostId = null; mesh.hostToken = null; analysers.clear(); queue = [];
   $('videos').innerHTML = ''; $('messages').innerHTML = ''; $('userList').innerHTML = '';
   $('room').classList.add('hidden'); $('lobby').classList.remove('hidden');
 };
