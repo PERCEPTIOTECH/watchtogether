@@ -8,7 +8,8 @@
 
   let video = null;
   let applyingRemote = false;      // uzak komut uygularken yerel event'i bastır
-  const SEEK_EPS = 0.75;           // bu saniyeden az farkı görmezden gel (drift toleransı)
+  const SEEK_EPS = 1.25;           // bu saniyeden az farkı görmezden gel → küçük kaymalarda
+                                   //   hard-seek yapıp videoyu dondurmaz (akıcı senkron)
 
   // Tüm videoları topla — açık shadow DOM'ların içindekiler dahil.
   function allVideos(root = document, acc = []) {

@@ -16,7 +16,7 @@ globalThis.MediaStream = P.MediaStream || class { addTrack() {} getTracks() { re
 const { Mesh } = await import('../extension/rtc.js');
 
 const ROOM = 'BOTEST';
-const results = { aSawB: false, bSawA: false, syncOK: false, chatOK: false, hbOK: false, srcOK: false, ctlOK: false };
+const results = { aSawB: false, bSawA: false, syncOK: false, chatOK: false, hbOK: false, srcOK: false, ctlOK: false, presOK: false };
 
 function makePeer(name) {
   const m = new Mesh();
@@ -62,9 +62,10 @@ B.onControl = (id, ids) => {
   if (Array.isArray(ids) && ids.includes(B.selfId)) results.ctlOK = true;
   finishSoon();
 };
+B.onPresence = (id, url) => { if (url === 'https://site.tld/bolum-3') results.presOK = true; finishSoon(); };
 A.onPeer = ((orig) => (id, nm) => {
   orig(id, nm);
-  setTimeout(() => { A.sendSource('https://site.tld/bolum-3'); A.sendControl([B.selfId]); }, 400);
+  setTimeout(() => { A.sendSource('https://site.tld/bolum-3'); A.sendControl([B.selfId]); A.sendPresence('https://site.tld/bolum-3'); }, 400);
 })(A.onPeer);
 A.onChat = (id, text) => {
   log(`[Ali] <- chat: "${text}"`);
@@ -89,7 +90,7 @@ B.onSync = (id, sync) => {
 
 let finished = false;
 function finishSoon() {
-  if (results.syncOK && results.chatOK && results.hbOK && results.srcOK && results.ctlOK && !finished) done(true);
+  if (results.syncOK && results.chatOK && results.hbOK && results.srcOK && results.ctlOK && results.presOK && !finished) done(true);
 }
 function done(ok) {
   if (finished) return;
@@ -101,8 +102,9 @@ function done(ok) {
   log('Heartbeat hizalama   :', results.hbOK ? '✅' : '❌');
   log('Host-takip (source)  :', results.srcOK ? '✅' : '❌');
   log('Kontrol yetkisi      :', results.ctlOK ? '✅' : '❌');
+  log('Presence (kim nerede) :', results.presOK ? '✅' : '❌');
   log('Chat iletildi        :', results.chatOK ? '✅' : '❌');
-  const pass = results.aSawB && results.bSawA && results.syncOK && results.hbOK && results.srcOK && results.ctlOK && results.chatOK;
+  const pass = results.aSawB && results.bSawA && results.syncOK && results.hbOK && results.srcOK && results.ctlOK && results.presOK && results.chatOK;
   log(pass ? '\n🎉 UÇTAN UCA GEÇTİ — P2P birlikte-izle çalışıyor' : '\n❌ TEST BAŞARISIZ');
   try { A.leave(); B.leave(); } catch {}
   setTimeout(() => process.exit(pass ? 0 : 1), 300);

@@ -117,7 +117,14 @@ input[type=text]:focus { outline: none; border-color: var(--accent); }
 .urow:hover { background: var(--surface); }
 .uav { width: 30px; height: 30px; border-radius: 50%; flex: none; display: grid; place-items: center; font-size: 12px; font-weight: 600; color: #fff; }
 .urow.speaking .uav { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ok); }
-.uname { flex: 1; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.uname-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+.uname { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.usub { font-size: 10.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.usub.ok { color: var(--ok); }
+.usub.diff { color: var(--warn); }
+.syncsum { font-size: 10.5px; font-weight: 600; }
+.syncsum.ok { color: var(--ok); }
+.syncsum.warn { color: var(--warn); }
 .ustatus { display: flex; align-items: center; gap: 7px; color: var(--muted); }
 .ustatus svg { display: block; }
 .ustatus .s-host { color: var(--accent); }

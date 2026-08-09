@@ -59,6 +59,7 @@ export class Mesh {
     this.onQueue = () => {};       // (peerId, items) — paylaşımlı sıradaki listesi
     this.onSource = () => {};      // (peerId, url) — host'un şu an izlediği sayfa (takip et)
     this.onControl = () => {};     // (peerId, ids[]) — kontrol yetkisi olan kullanıcılar
+    this.onPresence = () => {};    // (peerId, url) — o kişinin şu an hangi sayfada olduğu
   }
 
   static newRoom() { return rid(6); }
@@ -234,6 +235,7 @@ export class Mesh {
       if (m.t === 'hello') { state.name = m.name; this.onPeer(peerId, m.name); return; }
       if (m.t === 'chat') { this.onChat(peerId, m.text); return; }
       if (m.t === 'media') { this.onMediaState(peerId, { mic: m.mic, cam: m.cam }); return; }
+      if (m.t === 'here') { this.onPresence(peerId, m.url); return; }
       // YETKİ GEREKTİRENLER — gönderen doğrulanmazsa YOK SAY (görmezden gel)
       if (m.t === 'hb') { if (peerId === this.hostId) this.onHeartbeat(peerId, m); return; }
       if (m.t === 'nav') { if (peerId === this.hostId) this.onNavigate(peerId, m.url); return; }
@@ -304,6 +306,7 @@ export class Mesh {
   sendSource(url) { this.broadcast({ t: 'src', url }); }
   sendControl(ids) { this.controllers = new Set(ids || []); this.broadcast({ t: 'ctl', ids }); }
   sendMediaState(mic, cam) { this.broadcast({ t: 'media', mic, cam }); }
+  sendPresence(url) { this.broadcast({ t: 'here', url }); }
 
   leave() {
     this._shouldReconnect = false;

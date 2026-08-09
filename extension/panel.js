@@ -259,9 +259,35 @@ async function startRoom(room, opts = {}) {
   setInterval(() => {
     if (!joined) return;
     toParent('video-query');
-    if (amHost() && (tick++ % 2 === 0)) mesh.sendSource(basePage(pageUrl));
+    if (amHost()) refreshHostUrl();                   // gerçek sekme URL'ini oku (SPA dahil)
+    if (tick % 2 === 0) {                              // ~2sn'de bir
+      mesh.sendPresence(basePage(pageUrl));           // "ben şu an buradayım" (herkes)
+      if (amHost()) mesh.sendSource(basePage(pageUrl));
+    }
+    tick++;
   }, 1000);
   setTimeout(() => toParent('video-query'), 500);
+}
+
+// Panelin kendi sekme id'si (aktif sekme DEĞİL → host başka sekmeye geçince kimseyi sürüklemez)
+let myTabId = null;
+try { chrome?.tabs?.getCurrent?.((t) => { if (t && t.id != null) myTabId = t.id; }); } catch {}
+
+// Host: kontrol ettiği sekmenin URL'ini chrome.tabs ile DOĞRUDAN oku. Değişince (başka
+// video/bölüm) hemen herkese yay. Sekme id'si bilinmiyorsa content-panel'in bildirimine güven.
+function refreshHostUrl() {
+  const id = targetTabId != null ? targetTabId : myTabId;
+  if (id == null) return;
+  try { chrome?.tabs?.get?.(id, (t) => { if (!chrome.runtime.lastError && t && t.url) applyHostUrl(t.url); }); } catch {}
+}
+function applyHostUrl(url) {
+  if (!/^https?:/.test(url)) return;
+  if (basePage(url) !== basePage(pageUrl)) {
+    pageUrl = url; ownUrl = url;
+    mesh.sendSource(basePage(pageUrl));
+    addSys('Video değişti — herkese yayınlanıyor');
+    toParent('video-query');
+  }
 }
 
 function wireMesh() {
@@ -296,6 +322,7 @@ function wireMesh() {
     document.querySelector(`.tile[data-id="${CSS.escape(id)}"]`)?.classList.toggle('camoff', !st.cam);
     renderUsers();
   };
+  mesh.onPresence = (id, url) => { const r = roster.get(id); if (r) { r.url = url; renderUsers(); } };
   mesh.onNavigate = (id, url) => toParent('navigate', { url });
   mesh.onQueue = (id, items) => { queue = items || []; renderQueue(); };
   mesh.onSource = (id, url) => {
@@ -318,6 +345,7 @@ function wireMesh() {
 function updateControlUI() {
   const allowed = canControl();
   $('player').classList.toggle('locked', !allowed);
+  $('syncAllBtn').classList.toggle('hidden', !amHost());   // sadece host "herkesi eşitle" görür
   const note = !mesh.hostId ? 'Host bekleniyor…' : allowed ? (amHost() ? 'Kontrol sende (host)' : 'Kontrol sende') : 'Kontrol host’ta';
   $('ctlNote').textContent = note;
 }
@@ -334,10 +362,23 @@ function recomputeControllers() {
   mesh.sendControl(ids); renderUsers(); updateControlUI();
 }
 
+// Katılımcı senkron özeti (kaçı seninle aynı videoda)
+function updateSyncSummary() {
+  const el = $('syncSummary'); if (!el) return;
+  const myBase = basePage(pageUrl);
+  let total = 0, together = 0;
+  for (const [key, u] of roster) { if (key === 'self') continue; total++; if (u.url === myBase) together++; }
+  el.classList.remove('ok', 'warn');
+  if (total === 0) { el.textContent = ''; return; }
+  if (together === total) { el.textContent = 'hepsi senkron'; el.classList.add('ok'); }
+  else { el.textContent = `${total - together} kişi farklı videoda`; el.classList.add('warn'); }
+}
+
 // ---- Katılımcı listesi ----
 function renderUsers() {
   const list = $('userList'); list.innerHTML = '';
   $('userCount').textContent = roster.size;
+  updateSyncSummary();
   const keys = [...roster.keys()].sort((a) => (a === 'self' ? -1 : 1));
   for (const key of keys) {
     const u = roster.get(key), rid = realId(key), host = rid === mesh.hostId;
@@ -347,8 +388,18 @@ function renderUsers() {
     const av = document.createElement('span'); av.className = 'uav';
     av.style.background = palOf(rid); av.textContent = initials(u.name);
 
+    const nmWrap = document.createElement('div'); nmWrap.className = 'uname-wrap';
     const nm = document.createElement('span'); nm.className = 'uname';
     nm.textContent = u.name + (key === 'self' ? ' (sen)' : '');
+    nmWrap.appendChild(nm);
+    if (key !== 'self') {                                  // hangi videoda + senkron mu
+      const sub = document.createElement('span'); sub.className = 'usub';
+      const myBase = basePage(pageUrl);
+      if (!u.url) sub.textContent = 'bağlanıyor…';
+      else if (u.url === myBase) { sub.classList.add('ok'); sub.textContent = 'senkron · aynı videoda'; }
+      else { sub.classList.add('diff'); sub.textContent = 'farklı: ' + shortUrl(u.url); sub.title = u.url; }
+      nmWrap.appendChild(sub);
+    }
 
     const st = document.createElement('span'); st.className = 'ustatus';
     if (host) st.insertAdjacentHTML('beforeend', `<span class="s-host" title="Host">${IC.host(14)}</span>`);
@@ -367,7 +418,7 @@ function renderUsers() {
         st.insertAdjacentHTML('beforeend', `<span class="s-ctl granted" title="Kontrol yetkisi var">${IC.key(14)}</span>`);
       }
     }
-    row.append(av, nm, st); list.appendChild(row);
+    row.append(av, nmWrap, st); list.appendChild(row);
   }
 }
 
@@ -500,6 +551,12 @@ function goTo(q) {
 
 // ---- Kontroller / medya / oda çubuğu ----
 $('resyncBtn').onclick = () => toParent('video-query');
+$('syncAllBtn').onclick = () => {
+  if (!amHost() || !joined) return;
+  mesh.sendSource(basePage(pageUrl));                                   // herkesi bu videoya getir
+  mesh.sendSync({ type: vstate.paused ? 'pause' : 'play', time: vstate.time });  // ve bu konuma
+  addSys('Herkes sana eşitlendi');
+};
 $('cinemaBtn').onclick = () => toParent('cinema');
 $('camToggle').onclick = () => $('camSection').classList.toggle('collapsed');
 
