@@ -110,10 +110,25 @@
       chrome.runtime.sendMessage({ wt: true, kind: 'set-target', tabId: m.tabId }, () => void chrome.runtime.lastError);
     } else if (m.kind === 'navigate' && m.url) {
       chrome.runtime.sendMessage({ wt: true, kind: 'navigate-tab', url: m.url }, () => void chrome.runtime.lastError);
+    } else if (m.kind === 'next-episode') {
+      const ok = clickNext();
+      if (iframe) iframe.contentWindow.postMessage({ wt: true, kind: 'next-result', ok }, '*');
     } else if (m.kind === 'close-panel') {
       toggle(false);
     }
   });
+
+  // Sayfadaki "Sonraki Bölüm / Next Episode" düğmesini bulup tıkla (siteye özel değil, metinden)
+  function clickNext() {
+    const strict = /(sonraki\s*böl|sıradaki\s*böl|next\s*episode|next\s*bölüm)/i;
+    const loose = /(sonraki|next\s*video|ileri|next)/i;
+    const txt = (el) => (el.textContent || el.getAttribute('aria-label') || el.title || '').trim();
+    const els = [...document.querySelectorAll('a, button, [role="button"]')].filter((el) => el.offsetParent !== null);
+    let btn = els.find((el) => strict.test(txt(el)));
+    if (!btn) btn = els.find((el) => { const t = txt(el); return t.length < 30 && loose.test(t); });
+    if (btn) { btn.click(); return true; }
+    return false;
+  }
 
   function readSession() {
     try { return JSON.parse(sessionStorage.getItem('wt-session') || 'null'); } catch { return null; }

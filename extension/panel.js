@@ -10,7 +10,7 @@ const roster = new Map();               // key ('self'|peerId) -> {name, mic, ca
 const grantedNames = new Set();         // host: kontrol verilen İSİMLER (F5 sonrası id değişse de korunur)
 let queue = [];
 let vstate = { time: 0, duration: 0, paused: true, at: 0 };
-let seeking = false;
+let seeking = false, loopTimer = null;
 
 const basePage = (u) => (u || '').split('#')[0];
 const realId = (key) => (key === 'self' ? mesh.selfId : key);
@@ -56,6 +56,7 @@ window.addEventListener('message', (e) => {
   else if (m.kind === 'video-event') handleVideoEvent(m.event);
   else if (m.kind === 'cinema-state') { cinemaOn = m.on; $('cinemaBtn').classList.toggle('on', cinemaOn); }
   else if (m.kind === 'tabs') populateTabs(m.tabs, m.current, m.target);
+  else if (m.kind === 'next-result') { if (!m.ok) addSys('Bu sayfada "sonraki bölüm" düğmesi bulunamadı — sıradakiyle veya elle geçebilirsin'); }
 });
 toParent('request-url');
 
@@ -256,7 +257,8 @@ async function startRoom(room, opts = {}) {
     }
   }
   let tick = 0;
-  setInterval(() => {
+  clearInterval(loopTimer);                            // eski döngü varsa durdur (üst üste binmesin)
+  loopTimer = setInterval(() => {
     if (!joined) return;
     toParent('video-query');
     if (amHost()) refreshHostUrl();                   // gerçek sekme URL'ini oku (SPA dahil)
@@ -323,6 +325,7 @@ function wireMesh() {
     renderUsers();
   };
   mesh.onPresence = (id, url) => { const r = roster.get(id); if (r) { r.url = url; renderUsers(); } };
+  mesh.onReqNext = () => { if (amHost()) doNextEpisode(); };   // yetkili istedi → host uygular → herkes geçer
   mesh.onNavigate = (id, url) => toParent('navigate', { url });
   mesh.onQueue = (id, items) => { queue = items || []; renderQueue(); };
   mesh.onSource = (id, url) => {
@@ -346,6 +349,7 @@ function updateControlUI() {
   const allowed = canControl();
   $('player').classList.toggle('locked', !allowed);
   $('syncAllBtn').classList.toggle('hidden', !amHost());   // sadece host "herkesi eşitle" görür
+  $('nextEpBtn').classList.toggle('hidden', !allowed);     // kontrol yetkisi olan "sonraki bölüm" görür
   const note = !mesh.hostId ? 'Host bekleniyor…' : allowed ? (amHost() ? 'Kontrol sende (host)' : 'Kontrol sende') : 'Kontrol host’ta';
   $('ctlNote').textContent = note;
 }
@@ -557,6 +561,13 @@ $('syncAllBtn').onclick = () => {
   mesh.sendSync({ type: vstate.paused ? 'pause' : 'play', time: vstate.time });  // ve bu konuma
   addSys('Herkes sana eşitlendi');
 };
+// Sonraki bölüm: host doğrudan uygular; yetkili guest host'a istek yollar → karşılıklı çalışır
+function doNextEpisode() { toParent('next-episode'); }
+$('nextEpBtn').onclick = () => {
+  if (!canControl() || !joined) return;
+  if (amHost()) doNextEpisode();
+  else { mesh.sendReqNext(); addSys('Sonraki bölüm istendi…'); }
+};
 $('cinemaBtn').onclick = () => toParent('cinema');
 $('camToggle').onclick = () => $('camSection').classList.toggle('collapsed');
 
@@ -593,7 +604,7 @@ async function doInvite() {
 $('inviteBtn').onclick = doInvite;
 $('copyLink').onclick = doInvite;
 $('leaveBtn').onclick = () => {
-  mesh.leave(); joined = false; if (cinemaOn) toParent('cinema', { on: false });
+  mesh.leave(); joined = false; clearInterval(loopTimer); if (cinemaOn) toParent('cinema', { on: false });
   toParent('session-active', { on: false });
   roster.clear(); mesh.controllers.clear(); grantedNames.clear(); mesh.hostId = null; mesh.hostToken = null; analysers.clear(); queue = [];
   $('videos').innerHTML = ''; $('messages').innerHTML = ''; $('userList').innerHTML = '';

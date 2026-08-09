@@ -24,23 +24,29 @@ A.onNavigate = () => { g.aUnauthNav = true; };
 A.onHeartbeat = () => { g.aUnauthHb = true; };
 A.onControl = () => { g.aUnauthCtl = true; };
 A.onSync = (id, s) => { g.aSyncTimes.push(s.time); };
+g.reqNextCount = 0;
+A.onReqNext = () => { g.reqNextCount++; };   // yetkisizken 0, yetki verilince 1 olmalı
 
 // B (guest) — host'tan gelen mesajları kabul etmeli
 B.onNavigate = () => { g.bHostNav = true; };
 B.onControl = () => { g.bCtl = true; };
 
+let bArmed = false, aArmed = false;            // onPeer dc-open + hello ile 2 kez tetiklenir → tek sefere sabitle
 B.onPeer = () => {
-  // B guest: yetkisiz denemeler (hepsi reddedilmeli) + erken sync (kontrol yokken)
+  if (bArmed) return; bArmed = true;
+  // B guest: yetkisiz denemeler (hepsi reddedilmeli) + erken sync/reqnext (kontrol yokken)
   B.sendNavigate('https://evil.example');
   B.sendHeartbeat({ time: 5, paused: false });
   B.sendControl([B.selfId]);
   B.sendSync({ type: 'play', time: 1 });     // kontrol yokken → reddedilmeli
+  B.sendReqNext();                            // kontrol yokken → host almamalı
 };
 A.onPeer = () => {
+  if (aArmed) return; aArmed = true;
   setTimeout(() => {
     A.sendNavigate('https://good.example');  // host → B kabul etmeli
     A.sendControl([B.selfId]);               // B'ye kontrol ver
-    setTimeout(() => B.sendSync({ type: 'play', time: 9 }), 600);  // artık B controller → A kabul etmeli
+    setTimeout(() => { B.sendSync({ type: 'play', time: 9 }); B.sendReqNext(); }, 600);  // artık B controller → A kabul etmeli
   }, 700);
 };
 
@@ -51,11 +57,13 @@ setTimeout(() => {
   const hostOk = A.amHost() && !B.amHost() && B.hostId === A.selfId;
   const rejectOk = !g.aUnauthNav && !g.aUnauthHb && !g.aUnauthCtl && !g.aSyncTimes.includes(1);
   const acceptOk = g.bHostNav && g.bCtl && g.aSyncTimes.includes(9);
+  const reqNextOk = g.reqNextCount === 1;   // yetkisiz reddedildi, yetkiliyken 1 kez geçti
   log('\n──────── SONUÇ ────────');
   log('Sunucu host\'u doğru belirledi        :', hostOk ? '✅' : '❌');
   log('Yetkisiz guest mesajları reddedildi  :', rejectOk ? '✅' : `❌ nav=${g.aUnauthNav} hb=${g.aUnauthHb} ctl=${g.aUnauthCtl} sync1=${g.aSyncTimes.includes(1)}`);
   log('Host mesajları + verilen yetki geçti :', acceptOk ? '✅' : `❌ nav=${g.bHostNav} ctl=${g.bCtl} sync9=${g.aSyncTimes.includes(9)}`);
-  const pass = hostOk && rejectOk && acceptOk;
+  log('Sonraki-bölüm isteği yetki denetimi  :', reqNextOk ? '✅' : `❌ (${g.reqNextCount})`);
+  const pass = hostOk && rejectOk && acceptOk && reqNextOk;
   log(pass ? '\n🎉 MESAJ YETKİLENDİRME ÇALIŞIYOR' : '\n❌ BAŞARISIZ');
   process.on('uncaughtException', () => {});
   try { A.leave(); B.leave(); } catch {}

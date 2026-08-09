@@ -60,6 +60,7 @@ export class Mesh {
     this.onSource = () => {};      // (peerId, url) — host'un şu an izlediği sayfa (takip et)
     this.onControl = () => {};     // (peerId, ids[]) — kontrol yetkisi olan kullanıcılar
     this.onPresence = () => {};    // (peerId, url) — o kişinin şu an hangi sayfada olduğu
+    this.onReqNext = () => {};     // (peerId) — yetkili biri "sonraki bölüm" istedi (host uygular)
   }
 
   static newRoom() { return rid(6); }
@@ -243,6 +244,7 @@ export class Mesh {
       if (m.t === 'ctl') { if (peerId === this.hostId) { this.controllers = new Set(m.ids || []); this.onControl(peerId, m.ids); } return; }
       if (m.t === 'sync') { if (this._canControl(peerId)) this.onSync(peerId, m); return; }
       if (m.t === 'queue') { if (this._canControl(peerId)) this.onQueue(peerId, m.items); return; }
+      if (m.t === 'reqnext') { if (this._canControl(peerId)) this.onReqNext(peerId); return; }
     };
   }
 
@@ -307,6 +309,7 @@ export class Mesh {
   sendControl(ids) { this.controllers = new Set(ids || []); this.broadcast({ t: 'ctl', ids }); }
   sendMediaState(mic, cam) { this.broadcast({ t: 'media', mic, cam }); }
   sendPresence(url) { this.broadcast({ t: 'here', url }); }
+  sendReqNext() { this.broadcast({ t: 'reqnext' }); }
 
   leave() {
     this._shouldReconnect = false;
