@@ -35,10 +35,9 @@ A.onPeer = (id, nm) => {
   setTimeout(() => {
     log('[Ali] -> sendSync {play, time:42}');
     A.sendSync({ type: 'play', time: 42, rate: 1 });
-    // Heartbeat yolu: lider olan taraf periyodik hizalama yollar
-    const leader = A.isLeader() ? A : B;
-    log(`[${A.isLeader() ? 'Ali' : 'Veli'}] lider → sendHeartbeat {time:100, paused:false}`);
-    leader.sendHeartbeat({ time: 100, paused: false });
+    // Heartbeat: HOST (A, ilk giren) yollar → guest kabul eder
+    log('[Ali] host → sendHeartbeat {time:100, paused:false}');
+    A.sendHeartbeat({ time: 100, paused: false });
   }, 300);
 };
 

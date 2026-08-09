@@ -17,10 +17,11 @@ const base0 = (u) => (u || '').split('#')[0];
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function client(name, creator, startBase) {
-  const st = { name, creator, base: startBase, navs: [], m: new Mesh() };
-  st.m.onPeer = () => { if (st.creator) st.m.sendSource(st.base); };   // host: yeni gelene kaynağı bildir
+  const st = { name, creator, base: startBase, navs: [], token: null, m: new Mesh() };
+  st.m.onHostToken = (t) => { st.token = t; };                         // host token'ı sakla (sayfa değişince reclaim)
+  st.m.onPeer = () => { if (st.m.amHost()) st.m.sendSource(st.base); };
   st.m.onSource = (id, url) => {
-    if (st.creator) return;                                            // host takip ETMEZ (ping-pong önlenir)
+    if (st.m.amHost()) return;                                         // host takip ETMEZ (ping-pong önlenir)
     if (url && base0(url) !== base0(st.base)) { st.navs.push(base0(url)); st.base = base0(url); }
   };
   return st;
@@ -39,9 +40,11 @@ log(`Faz 1 — ikisi de bölüm-2. Veli takip sayısı: ${veli.navs.length} (0 o
 
 // Host "Sonraki Bölüm"e geçiyor: eski bağlantıyı bırak, YENİ id ile (ama yine host) tekrar bağlan
 log('Host bölüm-3\'e geçiyor (sayfa yenilenmesi simülasyonu)…');
+const savedToken = ali.token;                            // host token'ı sakla
 ali.m.leave();
 await wait(500);
-ali = client('Ali', true, 'https://site.tld/bolum-3');   // yeni Mesh = yeni selfId, creator hâlâ true
+ali = client('Ali', true, 'https://site.tld/bolum-3');   // yeni Mesh = yeni selfId
+ali.m.hostToken = savedToken;                            // token'la host'luğu geri al
 ali.m.connect(ROOM, 'Ali');
 await wait(3500);
 ali.m.sendSource(ali.base);                               // periyodik kaynak yayını

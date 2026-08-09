@@ -39,7 +39,14 @@ export class Mesh {
     this.localStream = null;
     this.peers = new Map();   // peerId -> { pc, dc, name, polite, makingOffer, ignoreOffer }
 
+    // Otorite (sunucudan gelir)
+    this.hostId = null;          // odanın host peerId'si (sunucu belirler)
+    this.hostToken = null;       // host kimlik token'ı (sayfa değişince reclaim için)
+    this.controllers = new Set();// host'un kontrol yetkisi verdiği peerId'ler
+
     // Dışarıdan atanacak geri çağrılar
+    this.onHost = () => {};        // (hostId) — host değişti
+    this.onHostToken = () => {};   // (token) — sunucu bana host token verdi (sakla)
     this.onStatus = () => {};
     this.onPeer = () => {};        // (peerId, name)
     this.onLeave = () => {};       // (peerId)
@@ -59,6 +66,11 @@ export class Mesh {
   // Oda üyeleri (kendisi dahil) ve lider seçimi (en küçük id = lider, deterministik)
   memberIds() { return [this.selfId, ...this.peers.keys()]; }
   isLeader() { return this.memberIds().sort()[0] === this.selfId; }
+
+  // Otorite denetimi (sunucu-belirli host)
+  amHost() { return this.hostId != null && this.hostId === this.selfId; }
+  iCanControl() { return this.amHost() || this.controllers.has(this.selfId); }
+  _canControl(peerId) { return peerId === this.hostId || this.controllers.has(peerId); }
 
   async setLocalStream(stream) {
     this.localStream = stream;
@@ -82,7 +94,8 @@ export class Mesh {
     this.ws = ws;
 
     ws.onopen = () => {
-      ws.send(JSON.stringify({ type: 'join', room: this.room, peer: this.selfId }));
+      // Host token varsa (sayfa değişimi sonrası) sun → sunucu host'luğu geri verir
+      ws.send(JSON.stringify({ type: 'join', room: this.room, peer: this.selfId, hostToken: this.hostToken || undefined }));
       this.onStatus('bağlı, eşler bekleniyor');
     };
     ws.onclose = () => this.onStatus('signaling koptu');
@@ -91,13 +104,17 @@ export class Mesh {
     ws.onmessage = async (ev) => {
       const msg = JSON.parse(ev.data);
       if (msg.type === 'peers') {
-        // Mevcut eşlere offer'ı BEN başlatırım (glare'i azaltır)
+        if (msg.host !== undefined) this._setHost(msg.host);
         for (const pid of msg.peers) this._ensurePeer(pid, true);
       } else if (msg.type === 'peer-joined') {
-        // Yeni gelen bana offer atacak; ben sadece bağlantıyı hazırlarım
+        if (msg.host !== undefined) this._setHost(msg.host);
         this._ensurePeer(msg.peer, false);
       } else if (msg.type === 'peer-left') {
         this._dropPeer(msg.peer);
+      } else if (msg.type === 'host') {
+        this._setHost(msg.peer);
+      } else if (msg.type === 'host-token') {
+        this.hostToken = msg.token; this.onHostToken(msg.token);
       } else if (msg.type === 'signal') {
         await this._onSignal(msg.from, msg.data);
       }
@@ -178,16 +195,24 @@ export class Mesh {
     };
     dc.onmessage = (e) => {
       let m; try { m = JSON.parse(e.data); } catch { return; }
-      if (m.t === 'hello') { state.name = m.name; this.onPeer(peerId, m.name); }
-      else if (m.t === 'chat') this.onChat(peerId, m.text);
-      else if (m.t === 'sync') this.onSync(peerId, m);
-      else if (m.t === 'hb') this.onHeartbeat(peerId, m);
-      else if (m.t === 'media') this.onMediaState(peerId, { mic: m.mic, cam: m.cam });
-      else if (m.t === 'nav') this.onNavigate(peerId, m.url);
-      else if (m.t === 'queue') this.onQueue(peerId, m.items);
-      else if (m.t === 'src') this.onSource(peerId, m.url);
-      else if (m.t === 'ctl') this.onControl(peerId, m.ids);
+      // Herkese açık mesajlar
+      if (m.t === 'hello') { state.name = m.name; this.onPeer(peerId, m.name); return; }
+      if (m.t === 'chat') { this.onChat(peerId, m.text); return; }
+      if (m.t === 'media') { this.onMediaState(peerId, { mic: m.mic, cam: m.cam }); return; }
+      // YETKİ GEREKTİRENLER — gönderen doğrulanmazsa YOK SAY (görmezden gel)
+      if (m.t === 'hb') { if (peerId === this.hostId) this.onHeartbeat(peerId, m); return; }
+      if (m.t === 'nav') { if (peerId === this.hostId) this.onNavigate(peerId, m.url); return; }
+      if (m.t === 'src') { if (peerId === this.hostId) this.onSource(peerId, m.url); return; }
+      if (m.t === 'ctl') { if (peerId === this.hostId) { this.controllers = new Set(m.ids || []); this.onControl(peerId, m.ids); } return; }
+      if (m.t === 'sync') { if (this._canControl(peerId)) this.onSync(peerId, m); return; }
+      if (m.t === 'queue') { if (this._canControl(peerId)) this.onQueue(peerId, m.items); return; }
     };
+  }
+
+  _setHost(id) {
+    if (id == null) this.controllers.clear();
+    this.hostId = id || null;
+    this.onHost(this.hostId);
   }
 
   async _onSignal(peerId, data) {
@@ -242,7 +267,7 @@ export class Mesh {
   sendNavigate(url) { this.broadcast({ t: 'nav', url }); }
   sendQueue(items) { this.broadcast({ t: 'queue', items }); }
   sendSource(url) { this.broadcast({ t: 'src', url }); }
-  sendControl(ids) { this.broadcast({ t: 'ctl', ids }); }
+  sendControl(ids) { this.controllers = new Set(ids || []); this.broadcast({ t: 'ctl', ids }); }
   sendMediaState(mic, cam) { this.broadcast({ t: 'media', mic, cam }); }
 
   leave() {

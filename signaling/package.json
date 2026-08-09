@@ -6,10 +6,11 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node test-e2e.mjs && node test-nextep.mjs && node test-signal.mjs",
+    "test": "node test-e2e.mjs && node test-nextep.mjs && node test-signal.mjs && node test-auth.mjs",
     "test:e2e": "node test-e2e.mjs",
     "test:nextep": "node test-nextep.mjs",
-    "test:signal": "node test-signal.mjs"
+    "test:signal": "node test-signal.mjs",
+    "test:auth": "node test-auth.mjs"
   },
   "dependencies": {
     "ws": "^8.18.0"

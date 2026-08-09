@@ -5,16 +5,17 @@ const $ = (id) => document.getElementById(id);
 const mesh = new Mesh();
 
 let pageUrl = '', joined = false, micOn = true, camOn = true, cinemaOn = false;
-let isCreator = false, autoTried = false;
-const roster = new Map();               // key ('self'|peerId) -> {name, mic, cam, host}
-const controllers = new Set();          // kontrol yetkisi verilen gerçek id'ler
+let isCreator = false, autoTried = false, curRoom = '', curName = '';
+const roster = new Map();               // key ('self'|peerId) -> {name, mic, cam}
 let queue = [];
 let vstate = { time: 0, duration: 0, paused: true, at: 0 };
 let seeking = false;
 
 const basePage = (u) => (u || '').split('#')[0];
 const realId = (key) => (key === 'self' ? mesh.selfId : key);
-const canControl = () => isCreator || controllers.has(mesh.selfId);
+// Otorite artık sunucu-belirli: host = mesh.hostId, kontrol = mesh.controllers
+const canControl = () => mesh.iCanControl();
+const amHost = () => mesh.amHost();
 
 // Düz renk avatar paleti (profesyonel, tek renk)
 const PAL = ['#6470ff', '#3ecf8e', '#e6a54b', '#f26d6d', '#a78bfa', '#38bdf8', '#f472b6', '#22b8cf'];
@@ -125,7 +126,7 @@ function maybeAutoJoin(session) {
   if (autoTried || joined) return;
   if (session && session.room) {
     autoTried = true; $('nameInput').value = session.name || '';
-    startRoom(session.room, { creator: !!session.creator, silent: true });
+    startRoom(session.room, { creator: !!session.creator, silent: true, token: session.token });
     return;
   }
   const match = /wt-join=([A-Z0-9]+)/i.exec((pageUrl.split('#')[1]) || '');
@@ -147,7 +148,7 @@ function handleVideoEvent(ev) {
   vstate = { time: ev.time || 0, duration: ev.dur || vstate.duration || 0, paused, at: Date.now() };
   setSync(paused ? 'ok-pause' : 'ok-play');
   if (ev.query) {
-    if (joined && isCreator) mesh.sendHeartbeat({ time: ev.time, paused, dur: ev.dur });
+    if (joined && amHost()) mesh.sendHeartbeat({ time: ev.time, paused, dur: ev.dur });
   } else {
     // Gerçek kullanıcı aksiyonu SADECE yetkisi olan kişide odaya yayılır
     if (joined && canControl()) mesh.sendSync(ev);
@@ -197,8 +198,9 @@ $('roomInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('jo
 
 async function startRoom(room, opts = {}) {
   const name = $('nameInput').value.trim() || 'Misafir';
-  isCreator = !!opts.creator;
-  roster.set('self', { name, mic: micOn, cam: camOn, host: isCreator });
+  isCreator = !!opts.creator; curRoom = room; curName = name;
+  mesh.hostToken = opts.token || null;      // token varsa host'luğu geri al (sayfa değişimi)
+  roster.set('self', { name, mic: micOn, cam: camOn });
   wireMesh();
   await initMedia();
   mesh.connect(room, name);
@@ -207,7 +209,7 @@ async function startRoom(room, opts = {}) {
   $('room').classList.remove('hidden');
   $('roomCode').textContent = room;
   renderUsers(); setSync('wait'); renderQueue(); updateControlUI(); requestTabs();
-  toParent('session-active', { on: true, room, name, creator: isCreator });
+  toParent('session-active', { on: true, room, name, creator: isCreator, token: mesh.hostToken });
 
   if (!opts.silent) {
     addSys(`Odaya katıldın · ${room}`);
@@ -222,19 +224,23 @@ async function startRoom(room, opts = {}) {
   setInterval(() => {
     if (!joined) return;
     toParent('video-query');
-    if (isCreator && (tick++ % 2 === 0)) mesh.sendSource(basePage(pageUrl));
+    if (amHost() && (tick++ % 2 === 0)) mesh.sendSource(basePage(pageUrl));
   }, 1000);
   setTimeout(() => toParent('video-query'), 500);
 }
 
 function wireMesh() {
   mesh.onStatus = setConn;
+  // Sunucu host'u belirledi/değiştirdi → UI tazele
+  mesh.onHost = () => { updateControlUI(); renderUsers(); };
+  // Sunucu bana host token verdi → oturuma kaydet (sayfa değişince reclaim)
+  mesh.onHostToken = (tok) => toParent('session-active', { on: true, room: curRoom, name: curName, creator: isCreator, token: tok });
   mesh.onPeer = (id, name) => {
     const r = roster.get(id) || { mic: true, cam: true }; r.name = name; roster.set(id, r);
     renderUsers(); renderName(id, name);
-    if (isCreator) { mesh.sendSource(basePage(pageUrl)); mesh.sendControl([...controllers]); }
+    if (amHost()) { mesh.sendSource(basePage(pageUrl)); mesh.sendControl([...mesh.controllers]); }
   };
-  mesh.onLeave = (id) => { roster.delete(id); controllers.delete(id); removeTile(id); analysers.delete(id); renderUsers(); addSys('Bir katılımcı ayrıldı'); };
+  mesh.onLeave = (id) => { roster.delete(id); mesh.controllers.delete(id); removeTile(id); analysers.delete(id); renderUsers(); addSys('Bir katılımcı ayrıldı'); };
   mesh.onStream = (id, stream) => { addTile(id, roster.get(id)?.name || 'Katılımcı', stream, false); watchSpeaking(id, stream); };
   mesh.onChat = (id, text) => addMsg(roster.get(id)?.name || 'Katılımcı', text, false, realId(id));
   mesh.onSync = (id, sync) => {
@@ -245,7 +251,7 @@ function wireMesh() {
     flashSync(sync);
   };
   mesh.onHeartbeat = (id, hb) => {
-    if (isCreator) return;
+    if (amHost()) return;
     videoCmd({ type: hb.paused ? 'pause' : 'play', time: hb.time });
     vstate = { time: hb.time || 0, duration: hb.dur || vstate.duration || 0, paused: hb.paused, at: Date.now() };
     setSync(hb.paused ? 'ok-pause' : 'ok-play');
@@ -258,33 +264,33 @@ function wireMesh() {
   mesh.onNavigate = (id, url) => toParent('navigate', { url });
   mesh.onQueue = (id, items) => { queue = items || []; renderQueue(); };
   mesh.onSource = (id, url) => {
-    const r = roster.get(id); if (r && !r.host) { r.host = true; renderUsers(); }
-    if (isCreator) return;
+    // rtc yalnızca host'tan geçirir; ben host'sam takip etmem
+    if (amHost()) return;
     if (url && basePage(url) !== basePage(pageUrl)) {
       const room = $('roomCode').textContent;
       addSys('Host sonraki bölüme geçti — takip ediliyor');
       toParent('navigate', { url: `${basePage(url)}#wt-join=${room}` });
     }
   };
-  mesh.onControl = (id, ids) => {
-    controllers.clear(); (ids || []).forEach((x) => controllers.add(x));
-    const had = canControl();
+  mesh.onControl = () => {
+    // rtc, host'tan gelen ctl ile mesh.controllers'ı zaten güncelledi
     updateControlUI(); renderUsers();
-    if (!isCreator && controllers.has(mesh.selfId) && had !== undefined) addSys('Kontrol sana verildi — artık oynatabilir/sarabilirsin');
+    if (!amHost() && mesh.controllers.has(mesh.selfId)) addSys('Kontrol sana verildi — artık oynatabilir/sarabilirsin');
   };
 }
 
 // ---- Kontrol yetkisi UI ----
-function hasControl(rid, host) { return host || controllers.has(rid); }
 function updateControlUI() {
   const allowed = canControl();
   $('player').classList.toggle('locked', !allowed);
-  $('ctlNote').textContent = allowed ? (isCreator ? 'Kontrol sende (host)' : 'Kontrol sende') : 'Kontrol host’ta';
+  const note = !mesh.hostId ? 'Host bekleniyor…' : allowed ? (amHost() ? 'Kontrol sende (host)' : 'Kontrol sende') : 'Kontrol host’ta';
+  $('ctlNote').textContent = note;
 }
 function toggleGrant(rid) {
-  if (!isCreator) return;
-  if (controllers.has(rid)) controllers.delete(rid); else controllers.add(rid);
-  mesh.sendControl([...controllers]); renderUsers(); updateControlUI();
+  if (!amHost()) return;
+  const c = mesh.controllers;
+  if (c.has(rid)) c.delete(rid); else c.add(rid);
+  mesh.sendControl([...c]); renderUsers(); updateControlUI();
 }
 
 // ---- Katılımcı listesi ----
@@ -293,7 +299,7 @@ function renderUsers() {
   $('userCount').textContent = roster.size;
   const keys = [...roster.keys()].sort((a) => (a === 'self' ? -1 : 1));
   for (const key of keys) {
-    const u = roster.get(key), rid = realId(key), host = key === 'self' ? isCreator : !!u.host;
+    const u = roster.get(key), rid = realId(key), host = rid === mesh.hostId;
     const row = document.createElement('div');
     row.className = 'urow'; row.dataset.id = key;
 
@@ -308,8 +314,8 @@ function renderUsers() {
     if (u.mic === false) st.insertAdjacentHTML('beforeend', `<span class="s-mute" title="Mikrofon kapalı">${IC.micOff(15)}</span>`);
     // Kontrol yetkisi göstergesi / host için ver-al düğmesi
     if (!host) {
-      const granted = controllers.has(rid);
-      if (isCreator) {
+      const granted = mesh.controllers.has(rid);
+      if (amHost()) {
         const b = document.createElement('span');
         b.className = 's-ctl' + (granted ? ' granted' : '');
         b.title = granted ? 'Kontrol yetkisini al' : 'Kontrol yetkisi ver';
@@ -491,7 +497,7 @@ $('copyLink').onclick = doInvite;
 $('leaveBtn').onclick = () => {
   mesh.leave(); joined = false; if (cinemaOn) toParent('cinema', { on: false });
   toParent('session-active', { on: false });
-  roster.clear(); controllers.clear(); analysers.clear(); queue = [];
+  roster.clear(); mesh.controllers.clear(); mesh.hostId = null; mesh.hostToken = null; analysers.clear(); queue = [];
   $('videos').innerHTML = ''; $('messages').innerHTML = ''; $('userList').innerHTML = '';
   $('room').classList.add('hidden'); $('lobby').classList.remove('hidden');
 };

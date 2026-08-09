@@ -1,68 +1,58 @@
-// WatchTogether — minimal WebRTC signaling relay.
-// Yalnızca oda üyeliği + offer/answer/ICE aday değişimi yapar.
-// Medya (ses/kamera) ve senkron/chat verisi buradan GEÇMEZ; P2P data channel/track ile akar.
+// WatchTogether — signaling relay + HOST OTORİTESİ.
+// Sunucu, odanın host'unu belirler ve herkese resmî olarak bildirir. Host, gizli bir
+// host-token ile tanımlanır → sayfa değişip yeniden bağlansa bile aynı kişi host kalır
+// (guest kendini host ilan edemez). Host ayrılırsa 8sn sonra kalan en eski üye terfi eder.
 
 const http = require('http');
+const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 
 const PORT = process.env.PORT || 8080;
+const GRACE_MS = 8000;
+const rooms = new Map(); // roomId -> { peers:Map(peerId->ws), hostPeer, hostToken, claimed, grace }
 
-// roomId -> Map(peerId -> ws)
-const rooms = new Map();
+const rid = (n = 24) => crypto.randomBytes(n).toString('hex').slice(0, n);
+function send(ws, msg) { if (ws && ws.readyState === ws.OPEN) { try { ws.send(JSON.stringify(msg)); } catch {} } }
+function broadcast(R, msg) { for (const [, w] of R.peers) send(w, msg); }
 
-const server = http.createServer((req, res) => {
-  // Basit sağlık kontrolü (Render/Fly health check için)
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('WatchTogether signaling OK\n');
-});
-
+const server = http.createServer((req, res) => { res.writeHead(200); res.end('WatchTogether signaling OK\n'); });
 const wss = new WebSocketServer({ server });
 
-function send(ws, msg) {
-  if (ws && ws.readyState === ws.OPEN) {
-    try { ws.send(JSON.stringify(msg)); } catch (_) {}
-  }
-}
-
 wss.on('connection', (ws) => {
-  let roomId = null;
-  let peerId = null;
+  let roomId = null, peerId = null;
 
   ws.on('message', (raw) => {
-    let msg;
-    try { msg = JSON.parse(raw); } catch { return; }
+    let msg; try { msg = JSON.parse(raw); } catch { return; }
 
-    switch (msg.type) {
-      case 'join': {
-        roomId = String(msg.room || '').slice(0, 64);
-        peerId = String(msg.peer || '').slice(0, 64);
-        if (!roomId || !peerId) return;
-        if (!rooms.has(roomId)) rooms.set(roomId, new Map());
-        const room = rooms.get(roomId);
+    if (msg.type === 'join') {
+      roomId = String(msg.room || '').slice(0, 64);
+      peerId = String(msg.peer || '').slice(0, 64);
+      if (!roomId || !peerId) return;
+      if (!rooms.has(roomId)) rooms.set(roomId, { peers: new Map(), hostPeer: null, hostToken: rid(24), claimed: false, grace: null });
+      const R = rooms.get(roomId);
 
-        // Yeni gelene mevcut eşleri bildir (offer'ları yeni gelen başlatır → glare yok)
-        send(ws, { type: 'peers', peers: [...room.keys()], self: peerId });
-        // Mevcut eşlere yeni katılımcıyı bildir
-        for (const [id, peerWs] of room) {
-          if (id !== peerId) send(peerWs, { type: 'peer-joined', peer: peerId });
-        }
-        room.set(peerId, ws);
-        break;
+      // Host belirleme: geçerli token → reclaim; yoksa ilk gelen (brand-new) → host + token
+      if (msg.hostToken && msg.hostToken === R.hostToken) {
+        if (R.grace) { clearTimeout(R.grace); R.grace = null; }
+        R.hostPeer = peerId;
+      } else if (!R.claimed && R.hostPeer === null && R.peers.size === 0) {
+        R.hostPeer = peerId; R.claimed = true;
+        send(ws, { type: 'host-token', token: R.hostToken });
       }
 
-      case 'signal': {
-        // offer/answer/candidate'i hedef eşe ilet
-        const room = rooms.get(roomId);
-        if (!room) return;
-        const target = room.get(msg.to);
-        if (target) send(target, { type: 'signal', from: peerId, data: msg.data });
-        break;
-      }
+      // Yeni gelene mevcut eşler + host; mevcutlara yeni katılan
+      send(ws, { type: 'peers', peers: [...R.peers.keys()], self: peerId, host: R.hostPeer });
+      for (const [id, w] of R.peers) if (id !== peerId) send(w, { type: 'peer-joined', peer: peerId, host: R.hostPeer });
+      R.peers.set(peerId, ws);
+      broadcast(R, { type: 'host', peer: R.hostPeer });   // herkes host'u kesin bilsin
 
-      case 'leave': {
-        cleanup();
-        break;
-      }
+    } else if (msg.type === 'signal') {
+      const R = rooms.get(roomId); if (!R) return;
+      const t = R.peers.get(msg.to);
+      if (t) send(t, { type: 'signal', from: peerId, data: msg.data });
+
+    } else if (msg.type === 'leave') {
+      cleanup();
     }
   });
 
@@ -70,15 +60,24 @@ wss.on('connection', (ws) => {
   ws.on('error', cleanup);
 
   function cleanup() {
-    const room = rooms.get(roomId);
-    if (!room) return;
-    if (room.get(peerId) === ws) room.delete(peerId);
-    for (const [, peerWs] of room) send(peerWs, { type: 'peer-left', peer: peerId });
-    if (room.size === 0) rooms.delete(roomId);
+    const R = rooms.get(roomId); if (!R) return;
+    if (R.peers.get(peerId) === ws) R.peers.delete(peerId);
+    for (const [, w] of R.peers) send(w, { type: 'peer-left', peer: peerId });
+
+    if (peerId === R.hostPeer) {
+      R.hostPeer = null;
+      broadcast(R, { type: 'host', peer: null });     // host yok → kimse otorite değil (ping-pong önlenir)
+      if (R.grace) clearTimeout(R.grace);
+      R.grace = setTimeout(() => {                     // host token'la dönmezse en eskiyi terfi et
+        R.grace = null;
+        const next = R.peers.keys().next().value;
+        if (next) { R.hostPeer = next; send(R.peers.get(next), { type: 'host-token', token: R.hostToken }); broadcast(R, { type: 'host', peer: next }); }
+      }, GRACE_MS);
+    }
+
+    if (R.peers.size === 0) { if (R.grace) clearTimeout(R.grace); rooms.delete(roomId); }
     roomId = peerId = null;
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`WatchTogether signaling listening on :${PORT}`);
-});
+server.listen(PORT, () => console.log(`WatchTogether signaling listening on :${PORT}`));

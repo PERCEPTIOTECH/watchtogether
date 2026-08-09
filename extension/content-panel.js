@@ -96,7 +96,7 @@
     } else if (m.kind === 'session-active') {
       // Panel bir odaya girdi/çıktı → sayfa oturumunda sakla ki bölüm değişince oda korunsun
       try {
-        if (m.on) sessionStorage.setItem('wt-session', JSON.stringify({ room: m.room, name: m.name, creator: m.creator }));
+        if (m.on) sessionStorage.setItem('wt-session', JSON.stringify({ room: m.room, name: m.name, creator: m.creator, token: m.token }));
         else sessionStorage.removeItem('wt-session');
       } catch (_) {}
     } else if (m.kind === 'cinema') {
