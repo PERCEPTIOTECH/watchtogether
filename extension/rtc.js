@@ -89,17 +89,24 @@ export class Mesh {
   connect(room, name) {
     this.room = room;
     this.name = name || 'Misafir';
-    this.onStatus('bağlanıyor…');
+    this._shouldReconnect = true;
+    this._retry = 0;
+    this._openWs();
+  }
+
+  _openWs() {
+    this.onStatus(this._retry ? 'yeniden bağlanılıyor…' : 'bağlanıyor…');
     const ws = new WebSocket(this.signalUrl || SIGNAL_URL);
     this.ws = ws;
 
     ws.onopen = () => {
-      // Host token varsa (sayfa değişimi sonrası) sun → sunucu host'luğu geri verir
+      this._retry = 0;
+      // Host token varsa (sayfa/ağ kesintisi sonrası) sun → sunucu host'luğu geri verir
       ws.send(JSON.stringify({ type: 'join', room: this.room, peer: this.selfId, hostToken: this.hostToken || undefined }));
       this.onStatus('bağlı, eşler bekleniyor');
     };
-    ws.onclose = () => this.onStatus('signaling koptu');
-    ws.onerror = () => this.onStatus('signaling hatası (sunucu açık mı?)');
+    ws.onclose = () => { this.onStatus('signaling koptu'); this._scheduleReconnect(); };
+    ws.onerror = () => { try { ws.close(); } catch {} };
 
     ws.onmessage = async (ev) => {
       const msg = JSON.parse(ev.data);
@@ -121,6 +128,14 @@ export class Mesh {
     };
   }
 
+  _scheduleReconnect() {
+    if (!this._shouldReconnect) return;
+    const delay = Math.min(15000, 1000 * Math.pow(2, this._retry++));
+    this.onStatus(`bağlantı koptu — ${Math.round(delay / 1000)}sn sonra yeniden bağlanılıyor…`);
+    clearTimeout(this._reconnectTimer);
+    this._reconnectTimer = setTimeout(() => { if (this._shouldReconnect) this._openWs(); }, delay);
+  }
+
   _signal(to, data) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify({ type: 'signal', to, data }));
@@ -133,7 +148,7 @@ export class Mesh {
     const pc = new RTCPeerConnection(ICE);
     // Politeness: id karşılaştırması → her çift için deterministik
     const polite = this.selfId > peerId;
-    const state = { pc, dc: null, name: null, polite, makingOffer: false, ignoreOffer: false, pendingCands: [], remoteReady: false, negotiated: false };
+    const state = { pc, dc: null, name: null, polite, initiator, iceRetried: false, makingOffer: false, ignoreOffer: false, pendingCands: [], remoteReady: false, negotiated: false };
     this.peers.set(peerId, state);
 
     this._addTracks(pc);
@@ -148,8 +163,22 @@ export class Mesh {
     pc.onnegotiationneeded = () => { if (state.negotiated) this._makeOffer(peerId); };
 
     pc.onconnectionstatechange = () => {
-      if (pc.connectionState === 'connected') { state.negotiated = true; this.onStatus('bağlı'); }
-      if (['failed', 'closed'].includes(pc.connectionState)) this._dropPeer(peerId);
+      const s = pc.connectionState;
+      if (s === 'connected') { state.negotiated = true; state.iceRetried = false; this.onStatus('bağlı'); return; }
+      if (s === 'closed') { this._dropPeer(peerId); return; }
+      if (s === 'failed') {
+        // Düşürmeden önce ICE restart dene (ağ yolu değişmiş olabilir)
+        if (state.initiator && !state.iceRetried) {
+          state.iceRetried = true;
+          this.onStatus('bağlantı onarılıyor…');
+          this._makeOffer(peerId, { iceRestart: true });
+        }
+        // Belirli süre içinde toparlamazsa düşür (initiator daha kısa, diğer taraf bekler)
+        const ms = state.initiator ? 10000 : 12000;
+        setTimeout(() => {
+          if (this.peers.get(peerId) === state && pc.connectionState !== 'connected') this._dropPeer(peerId);
+        }, ms);
+      }
     };
 
     const remoteStream = new MediaStream();
@@ -170,13 +199,13 @@ export class Mesh {
     return state;
   }
 
-  async _makeOffer(peerId) {
+  async _makeOffer(peerId, opts = {}) {
     const state = this.peers.get(peerId);
     if (!state) return;
     const pc = state.pc;
     try {
       state.makingOffer = true;
-      const offer = await pc.createOffer();
+      const offer = await pc.createOffer(opts);   // {iceRestart:true} → ICE restart
       await pc.setLocalDescription(offer);
       this._signal(peerId, { description: pc.localDescription });
     } catch (e) {
@@ -271,6 +300,8 @@ export class Mesh {
   sendMediaState(mic, cam) { this.broadcast({ t: 'media', mic, cam }); }
 
   leave() {
+    this._shouldReconnect = false;
+    clearTimeout(this._reconnectTimer);
     try { this.ws && this.ws.send(JSON.stringify({ type: 'leave' })); } catch {}
     for (const id of [...this.peers.keys()]) this._dropPeer(id);
     try { this.ws && this.ws.close(); } catch {}
