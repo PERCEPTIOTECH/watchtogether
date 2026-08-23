@@ -7,9 +7,17 @@
 </head>
 <body>
   <div id="app">
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+      <linearGradient id="wtgrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff5a5f"/><stop offset="1" stop-color="#ff3d6b"/></linearGradient>
+      <g id="wtmark">
+        <rect x="2.5" y="10" width="16" height="16" rx="4.2" fill="none" stroke="#9298a3" stroke-width="1.6" opacity=".5"/>
+        <rect x="11" y="5" width="18" height="18" rx="4.8" fill="url(#wtgrad)"/>
+        <path d="M17 9.5 L17 18.5 L23.5 14 Z" fill="#fff"/>
+      </g>
+    </defs></svg>
     <header>
       <div class="brand">
-        <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" width="17" height="17"><path d="M8 5v14l11-7z" fill="currentColor"/></svg></span>
+        <span class="logo" aria-hidden="true"><svg viewBox="0 0 32 30" width="30" height="28"><use href="#wtmark"/></svg></span>
         <div class="brand-txt">
           <b>WatchTogether</b>
           <small id="connPill"><i class="pulse"></i> hazır</small>
@@ -24,7 +32,7 @@
     <!-- LOBİ -->
     <section id="lobby" class="pane">
       <div class="hero">
-        <div class="hero-mark"><svg viewBox="0 0 24 24" width="26" height="26"><path d="M8 5v14l11-7z" fill="currentColor"/></svg></div>
+        <div class="hero-mark"><svg viewBox="0 0 32 30" width="54" height="51"><use href="#wtmark"/></svg></div>
         <p class="hero-title">Birlikte izleyin</p>
         <p class="hero-sub">Aynı sahne, aynı an — sesli ve kameralı.</p>
       </div>

@@ -1,0 +1,181 @@
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<title>WatchTogether Kimlik</title>
+<style>
+  :root{
+    --ink:#0B1114; --surface:#121A1E; --surface2:#18242A; --line:rgba(255,255,255,.09);
+    --aqua:#FF5A5F; --aqua-deep:#FF3D6B; --tally:#FF5A5F; --amber:#F5B841;
+    --paper:#EAF3F1; --muted:#8299A0;
+    --grad:linear-gradient(120deg,#FF5A5F,#FF3D6B);
+    --disp:"Inter",system-ui,sans-serif;
+    --ui:"Inter",system-ui,sans-serif;
+    --mono:"Inter",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--ink);color:var(--paper);font-family:var(--ui);line-height:1.5;
+    -webkit-font-smoothing:antialiased;overflow-x:hidden}
+  .wrap{max-width:960px;margin:0 auto;padding:0 28px}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:3px;text-transform:uppercase;color:var(--aqua)}
+  h2{font-family:var(--disp);font-weight:700;font-size:26px;letter-spacing:-.02em;text-wrap:balance;margin:6px 0 22px}
+  section{padding:64px 0;border-top:1px solid var(--line)}
+  .muted{color:var(--muted)}
+
+  /* Hero */
+  .hero{padding:88px 0 64px;position:relative}
+  .tally-bar{position:absolute;top:0;left:0;right:0;height:3px;background:var(--tally)}
+  .lockup{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+  .mark{width:96px;height:96px;flex:none}
+  .word{font-family:var(--disp);font-weight:800;font-size:clamp(40px,8vw,74px);letter-spacing:-.03em;line-height:.95}
+  .word .t{color:var(--aqua)}
+  .tag{font-size:18px;color:var(--muted);margin-top:18px;max-width:34ch}
+  .live{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:12px;letter-spacing:2px;
+    text-transform:uppercase;color:var(--tally);margin-top:26px}
+  .live .dot{width:8px;height:8px;border-radius:50%;background:var(--tally);box-shadow:0 0 0 0 rgba(255,90,95,.6);animation:pulse 1.8s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,90,95,.55)}70%{box-shadow:0 0 0 9px rgba(255,90,95,0)}100%{box-shadow:0 0 0 0 rgba(255,90,95,0)}}
+  @media(prefers-reduced-motion:reduce){.live .dot{animation:none}}
+
+  /* Logo variants */
+  .variants{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .vcard{border:1px solid var(--line);border-radius:14px;padding:26px;display:grid;place-items:center;min-height:130px}
+  .vcard.light{background:var(--paper)}
+  .vlabel{font-family:var(--mono);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-top:14px;text-align:center}
+
+  /* Colors */
+  .sw{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+  .chip{border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .chip .fill{height:82px}
+  .chip .meta{padding:12px 14px}
+  .chip .nm{font-weight:600;font-size:14px}
+  .chip .hex{font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:2px}
+  .chip .role{font-size:12px;color:var(--muted);margin-top:6px}
+
+  /* Type */
+  .type-row{padding:22px 0;border-bottom:1px solid var(--line)}
+  .type-row:last-child{border-bottom:0}
+  .type-name{font-family:var(--mono);font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--aqua)}
+  .type-role{font-size:13px;color:var(--muted);margin-bottom:12px}
+  .spec-disp{font-family:var(--disp);font-weight:800;font-size:clamp(30px,6vw,52px);letter-spacing:-.03em;line-height:1}
+  .spec-ui{font-family:var(--ui);font-size:19px}
+  .spec-mono{font-family:var(--mono);font-size:22px;letter-spacing:1px}
+
+  /* Application */
+  .app{display:flex;justify-content:center}
+  .panel{width:320px;border-radius:18px;overflow:hidden;border:1px solid var(--line);background:var(--surface)}
+  .p-h{display:flex;align-items:center;gap:10px;padding:13px 15px;border-bottom:1px solid var(--line)}
+  .p-logo{width:32px;height:32px;flex:none}
+  .p-title{font-family:var(--disp);font-weight:700;font-size:15px}
+  .p-sub{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+  .p-sub .d{width:7px;height:7px;border-radius:50%;background:var(--aqua)}
+  .p-player{display:flex;align-items:center;gap:10px;padding:13px 15px}
+  .p-play{width:38px;height:38px;flex:none;border-radius:11px;display:grid;place-items:center;color:#ffffff;background:var(--grad)}
+  .p-time{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .p-seek{position:relative;flex:1;height:4px;border-radius:3px;background:rgba(255,255,255,.12)}
+  .p-fill{position:absolute;left:0;top:0;height:4px;width:60%;border-radius:3px;background:var(--grad)}
+  .p-knob{position:absolute;left:60%;top:50%;width:12px;height:12px;border-radius:50%;background:#fff;transform:translate(-50%,-50%)}
+  .p-badge{display:flex;align-items:center;gap:8px;margin:0 15px 12px;padding:7px 11px;border-radius:9px;
+    background:rgba(255,90,95,.1);border:1px solid rgba(255,90,95,.4);font-size:12px}
+  .p-badge .d{width:8px;height:8px;border-radius:50%;background:var(--aqua)}
+  .p-user{display:flex;align-items:center;gap:10px;padding:8px 15px}
+  .p-av{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-family:var(--disp);font-weight:700;font-size:12px;color:#ffffff;background:var(--grad)}
+  .p-cta{margin:12px 15px 16px;padding:11px;border-radius:11px;text-align:center;font-weight:600;font-size:14px;color:#ffffff;background:var(--grad)}
+  .foot{padding:40px 0 64px;color:var(--muted);font-size:13px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+  .foot b{color:var(--paper);font-weight:600}
+  @media(max-width:640px){.variants{grid-template-columns:1fr}}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <g id="wtmark">
+    <rect x="8" y="20" width="34" height="34" rx="9" fill="none" stroke="currentColor" stroke-width="2.4" opacity=".45"/>
+    <rect x="20" y="12" width="38" height="38" rx="10.5" fill="rgba(255,90,95,.08)" stroke="#FF5A5F" stroke-width="2.6"/>
+    <path d="M33 23 L33 41 L47 32 Z" fill="#FF5A5F"/>
+    <circle cx="53" cy="17" r="5" fill="#FF5A5F"/>
+  </g>
+</defs></svg>
+
+<div class="hero">
+  <div class="tally-bar"></div>
+  <div class="wrap">
+    <div class="lockup">
+      <svg class="mark" viewBox="0 0 66 62" style="color:var(--muted)"><use href="#wtmark"/></svg>
+      <div>
+        <div class="word">Watch<span class="t">Together</span></div>
+      </div>
+    </div>
+    <p class="tag">Arkadaşınla aynı sahneyi, aynı an. Sesli, kameralı, gerçek zamanlı.</p>
+    <div class="live"><span class="dot"></span>şu an birlikte izliyor</div>
+  </div>
+</div>
+
+<section><div class="wrap">
+  <div class="eyebrow">Sembol</div>
+  <h2>İki ekran, tek an</h2>
+  <p class="muted" style="max-width:60ch;margin-bottom:26px">Arkadaki soluk kare “ikinci ekranı” — yani karşındaki kişiyi — temsil eder. Öndeki ekran senin, içindeki play ise ortak an. Köşedeki mercan nokta ise yayın dünyasının <b style="color:var(--paper);font-weight:500">canlı tally ışığı</b>: “şu an birlikteyiz” sinyali.</p>
+  <div class="variants">
+    <div class="vcard"><svg width="72" height="68" viewBox="0 0 66 62" style="color:var(--muted)"><use href="#wtmark"/></svg><div class="vlabel">Koyu zemin</div></div>
+    <div class="vcard light"><svg width="72" height="68" viewBox="0 0 66 62" style="color:#0B1114"><use href="#wtmark"/></svg><div class="vlabel">Açık zemin</div></div>
+    <div class="vcard"><svg width="72" height="68" viewBox="0 0 66 62" style="color:var(--muted)"><rect x="8" y="20" width="34" height="34" rx="9" fill="none" stroke="currentColor" stroke-width="2.4" opacity=".5"/><rect x="20" y="12" width="38" height="38" rx="10.5" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M33 23 L33 41 L47 32 Z" fill="currentColor"/><circle cx="53" cy="17" r="5" fill="currentColor"/></svg><div class="vlabel">Tek renk</div></div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="eyebrow">Renk</div>
+  <h2>Canlı yayın ışığı</h2>
+  <div class="sw">
+    <div class="chip"><div class="fill" style="background:#FF5A5F"></div><div class="meta"><div class="nm">Tally</div><div class="hex">#FF5A5F</div><div class="role">Ana marka · senkron · butonlar</div></div></div>
+    <div class="chip"><div class="fill" style="background:#FF3D6B"></div><div class="meta"><div class="nm">Tally Koyu</div><div class="hex">#FF3D6B</div><div class="role">Gradyan · hover</div></div></div>
+    <div class="chip"><div class="fill" style="background:#FF5A5F"></div><div class="meta"><div class="nm">Tally</div><div class="hex">#FF5A5F</div><div class="role">Canlı · kayıt · uyarı</div></div></div>
+    <div class="chip"><div class="fill" style="background:#F5B841"></div><div class="meta"><div class="nm">Amber</div><div class="hex">#F5B841</div><div class="role">Bekleme · dikkat</div></div></div>
+    <div class="chip"><div class="fill" style="background:#0B1114"></div><div class="meta"><div class="nm">Ink</div><div class="hex">#0B1114</div><div class="role">Zemin (teal eğilimli siyah)</div></div></div>
+    <div class="chip"><div class="fill" style="background:#EAF3F1"></div><div class="meta"><div class="nm">Paper</div><div class="hex">#EAF3F1</div><div class="role">Metin · açık zemin</div></div></div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="eyebrow">Tipografi</div>
+  <h2>Tek font, tam berraklık — Inter</h2>
+  <p class="muted" style="max-width:60ch;margin-bottom:22px">Her modern markanın uzandığı, nötr ve okunaklı gövde. Ağırlıklarla hiyerarşi kuruyoruz; ayrı bir display/mono yok — sadelik markanın kendisi.</p>
+  <div class="type-row">
+    <div class="type-name">Inter · 800 Extrabold</div>
+    <div class="type-role">Logo · başlıklar</div>
+    <div class="spec-disp">Birlikte izle</div>
+  </div>
+  <div class="type-row">
+    <div class="type-name">Inter · 400 / 500</div>
+    <div class="type-role">Arayüz · gövde · sohbet</div>
+    <div class="spec-ui">Oda oluştur, davet linkini gönder, aynı bölümde buluşun. Oynat, durdur, sar — hepsi herkeste eşitlenir.</div>
+  </div>
+  <div class="type-row">
+    <div class="type-name">Inter · Tabular</div>
+    <div class="type-role">Zaman kodu · oda kodu · veri</div>
+    <div class="spec-mono" style="font-variant-numeric:tabular-nums">25:50 / 40:58 · ODA QHB23V</div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="eyebrow">Uygulama</div>
+  <h2>Panelde kimlik</h2>
+  <p class="muted" style="max-width:56ch;margin-bottom:26px">Aynı sistem eklenti panelinde: aqua gradyan aksiyonlar, mercan canlı noktası, Bricolage başlık, mono zaman kodu.</p>
+  <div class="app">
+    <div class="panel">
+      <div class="p-h">
+        <svg class="p-logo" viewBox="0 0 66 62" style="color:var(--muted)"><use href="#wtmark"/></svg>
+        <div><div class="p-title">WatchTogether</div><div class="p-sub"><span class="d"></span>bağlı · 2 kişi</div></div>
+      </div>
+      <div class="p-player">
+        <span class="p-play"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M7 5h4v14H7zM13 5h4v14h-4z" fill="currentColor"/></svg></span>
+        <span class="p-time">25:50</span>
+        <div class="p-seek"><div class="p-fill"></div><div class="p-knob"></div></div>
+        <span class="p-time">40:58</span>
+      </div>
+      <div class="p-badge"><span class="d"></span>Eşitlendi · oynatılıyor</div>
+      <div class="p-user"><span class="p-av">SE</span><div><div style="font-size:13px">Sen (sen)</div><div style="font-size:10.5px;color:var(--aqua)">senkron · aynı videoda</div></div></div>
+      <div class="p-cta">Davet et</div>
+    </div>
+  </div>
+</div></section>
+
+<div class="wrap foot">
+  <span><b>WatchTogether</b> — marka kimliği v1</span>
+  <span>PERCEPT tarafından geliştirildi</span>
+</div>

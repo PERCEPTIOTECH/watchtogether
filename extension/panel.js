@@ -19,7 +19,7 @@ const canControl = () => mesh.iCanControl();
 const amHost = () => mesh.amHost();
 
 // Düz renk avatar paleti (profesyonel, tek renk)
-const PAL = ['#1ba8ff', '#22e0c8', '#2ee6a0', '#ffb020', '#a78bfa', '#ff5470', '#38bdf8', '#f472b6'];
+const PAL = ['#ff5a5f', '#ff9f45', '#ffd23f', '#2ee6a0', '#38bdf8', '#a78bfa', '#f472b6', '#22d3c5'];
 const palOf = (id) => PAL[hashStr(id) % PAL.length];
 
 // SVG ikonlar (stroke, sade)
