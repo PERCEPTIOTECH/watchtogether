@@ -1,0 +1,12 @@
+# WatchTogether — coturn (TURN sunucusu) — Docker ile tek komutta çalışır.
+# network_mode: host → TURN'ün UDP relay portları için ZORUNLU (bridge ile çalışmaz).
+services:
+  coturn:
+    image: coturn/coturn:latest
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - ./turnserver.conf:/etc/coturn/turnserver.conf:ro
+    # TLS kullanacaksan sertifikaları da mount et:
+    # - ./cert.pem:/etc/coturn/cert.pem:ro
+    # - ./key.pem:/etc/coturn/key.pem:ro

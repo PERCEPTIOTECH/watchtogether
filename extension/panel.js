@@ -84,6 +84,29 @@ $('signalInput')?.addEventListener('change', () => {
   addSys(u ? ('Sunucu ayarlandı: ' + u) : 'Sunucu: localhost');
 });
 
+// ---- TURN sunucusu (kendi TURN'ün — katı NAT için) ----
+function parseTurn(v) {
+  const parts = (v || '').trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 3) return null;
+  const credential = parts.pop(), username = parts.pop(), up = parts.join(' ');
+  let urls;
+  if (/turns?:/i.test(up)) urls = up.split(',').map((s) => s.trim()).filter(Boolean);
+  else urls = [`turn:${up}:80`, `turn:${up}:443`, `turns:${up}:443?transport=tcp`, `turn:${up}:443?transport=tcp`];
+  return { urls, username, credential };
+}
+try {
+  chrome?.storage?.local?.get?.('wt-turn', (r) => {
+    const v = r && r['wt-turn'];
+    if (v) { mesh.turn = parseTurn(v); if ($('turnInput')) $('turnInput').value = v; }
+  });
+} catch {}
+$('turnInput')?.addEventListener('change', () => {
+  const v = $('turnInput').value.trim();
+  mesh.turn = v ? parseTurn(v) : null;
+  try { chrome?.storage?.local?.set?.({ 'wt-turn': v }); } catch {}
+  addSys(mesh.turn ? 'TURN ayarlandı ✓ (yeni bağlantılarda geçerli)' : (v ? 'TURN formatı hatalı — "host kullanıcı şifre"' : 'TURN: varsayılan'));
+});
+
 // ---- Select Video (hangi sekmedeki video) ----
 function bgSend(msg, cb) {
   try { if (chrome?.runtime?.sendMessage) { chrome.runtime.sendMessage({ wt: true, ...msg }, (r) => { void chrome.runtime.lastError; cb && cb(r); }); return true; } } catch {}

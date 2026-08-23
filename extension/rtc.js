@@ -5,21 +5,14 @@
 
 const SIGNAL_URL = 'ws://localhost:8080';   // yayına alınca wss://... yap
 
-const ICE = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    // Ücretsiz TURN (katı NAT'lar için yedek). Yoğun kullanımda kendi coturn'unu kur.
-    {
-      urls: [
-        'turn:openrelay.metered.ca:80',
-        'turn:openrelay.metered.ca:443',
-        'turn:openrelay.metered.ca:443?transport=tcp',
-      ],
-      username: 'openrelayproject',
-      credential: 'openrelayproject',
-    },
-  ],
+const STUN = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+];
+// Son çare ücretsiz TURN (güvenilmez). Kendi TURN'ünü panelden ayarla → önce o denenir.
+const FALLBACK_TURN = {
+  urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turn:openrelay.metered.ca:443?transport=tcp'],
+  username: 'openrelayproject', credential: 'openrelayproject',
 };
 
 function rid(n = 6) {
@@ -36,6 +29,7 @@ export class Mesh {
     this.name = 'Misafir';
     this.ws = null;
     this.signalUrl = null;       // panelden ayarlanır; boşsa SIGNAL_URL (localhost)
+    this.turn = null;            // panelden ayarlanan kendi TURN sunucusu {urls,username,credential}
     this.localStream = null;
     this.peers = new Map();   // peerId -> { pc, dc, name, polite, makingOffer, ignoreOffer }
 
@@ -64,6 +58,13 @@ export class Mesh {
   }
 
   static newRoom() { return rid(6); }
+
+  _iceConfig() {
+    const servers = [...STUN];
+    if (this.turn && this.turn.urls) servers.push(this.turn);   // kendi TURN'ün önce denenir
+    servers.push(FALLBACK_TURN);                                // son çare ücretsiz TURN
+    return { iceServers: servers };
+  }
 
   // Oda üyeleri (kendisi dahil) ve lider seçimi (en küçük id = lider, deterministik)
   memberIds() { return [this.selfId, ...this.peers.keys()]; }
@@ -173,7 +174,7 @@ export class Mesh {
   _ensurePeer(peerId, initiator) {
     if (this.peers.has(peerId)) return this.peers.get(peerId);
 
-    const pc = new RTCPeerConnection(ICE);
+    const pc = new RTCPeerConnection(this._iceConfig());
     // Politeness: id karşılaştırması → her çift için deterministik
     const polite = this.selfId > peerId;
     const state = { pc, dc: null, name: null, polite, initiator, iceRetried: false, makingOffer: false, ignoreOffer: false, pendingCands: [], remoteReady: false, negotiated: false };
