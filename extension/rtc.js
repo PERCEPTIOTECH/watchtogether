@@ -94,7 +94,19 @@ export class Mesh {
     this._shouldReconnect = true;
     this._retry = 0;
     this._openWs();
+    this._startPing();
   }
+
+  // Gecikme ölçümü: her ~2sn ping at, pong'da RTT hesapla (aynı saat → clock-bağımsız)
+  _startPing() {
+    clearInterval(this._pingTimer);
+    this._pingTimer = setInterval(() => {
+      const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+      for (const [, st] of this.peers) this._send(st.dc, { t: 'ping', ts: now });
+    }, 2000);
+  }
+  rttTo(peerId) { const s = this.peers.get(peerId); return s && s.rtt ? s.rtt : 0; }   // ms
+  hostRtt() { return this.rttTo(this.hostId); }
 
   _openWs() {
     this.onStatus(this._retry ? 'yeniden bağlanılıyor…' : 'bağlanıyor…');
@@ -237,6 +249,8 @@ export class Mesh {
       if (m.t === 'chat') { this.onChat(peerId, m.text); return; }
       if (m.t === 'media') { this.onMediaState(peerId, { mic: m.mic, cam: m.cam }); return; }
       if (m.t === 'here') { this.onPresence(peerId, m.url); return; }
+      if (m.t === 'ping') { this._send(dc, { t: 'pong', ts: m.ts }); return; }
+      if (m.t === 'pong') { const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()); const rtt = now - m.ts; state.rtt = state.rtt ? state.rtt * 0.7 + rtt * 0.3 : rtt; return; }
       // YETKİ GEREKTİRENLER — gönderen doğrulanmazsa YOK SAY (görmezden gel)
       if (m.t === 'hb') { if (peerId === this.hostId) this.onHeartbeat(peerId, m); return; }
       if (m.t === 'nav') { if (peerId === this.hostId) this.onNavigate(peerId, m.url); return; }
@@ -315,6 +329,7 @@ export class Mesh {
   leave() {
     this._shouldReconnect = false;
     clearTimeout(this._reconnectTimer);
+    clearInterval(this._pingTimer);
     try { this.ws && this.ws.send(JSON.stringify({ type: 'leave' })); } catch {}
     for (const id of [...this.peers.keys()]) this._dropPeer(id);
     try { this.ws && this.ws.close(); } catch {}

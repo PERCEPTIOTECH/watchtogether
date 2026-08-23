@@ -268,6 +268,12 @@ async function startRoom(room, opts = {}) {
       mesh.sendPresence(basePage(pageUrl));           // "ben şu an buradayım" (herkes)
       if (amHost()) mesh.sendSource(basePage(pageUrl));
     }
+    // Ölçülen gecikmeyi durum çubuğunda göster
+    if (mesh.peers.size) {
+      let sum = 0, n = 0;
+      for (const [pid] of mesh.peers) { const r = mesh.rttTo(pid); if (r) { sum += r; n++; } }
+      if (n) renderConn(sum / n);
+    }
     tick++;
   }, 1000);
   setTimeout(() => toParent('video-query'), 500);
@@ -314,16 +320,24 @@ function wireMesh() {
   mesh.onStream = (id, stream) => { addTile(id, roster.get(id)?.name || 'Katılımcı', stream, false); watchSpeaking(id, stream); };
   mesh.onChat = (id, text) => addMsg(roster.get(id)?.name || 'Katılımcı', text, false, realId(id));
   mesh.onSync = (id, sync) => {
-    videoCmd(sync);
+    // Gecikme telafisi (oynarken): gönderenden bize gelen tek-yön gecikmeyi ekle
+    const willPlay = sync.type === 'play' ? true : sync.type === 'pause' ? false : !vstate.paused;
+    const oneWay = Math.min(2, (mesh.rttTo(id) / 2) / 1000);
+    const cmd = { ...sync };
+    if (typeof sync.time === 'number') cmd.time = sync.time + (willPlay ? oneWay : 0);
+    videoCmd(cmd);
     // Bar'ı ANINDA güncelle (video 'seeked' olayı applyingRemote yüzünden bastırılıyor)
-    if (typeof sync.time === 'number') { vstate.time = sync.time; vstate.at = Date.now(); }
+    if (typeof cmd.time === 'number') { vstate.time = cmd.time; vstate.at = Date.now(); }
     if (sync.type === 'play' || sync.type === 'pause') vstate.paused = sync.type === 'pause';
     flashSync(sync);
   };
   mesh.onHeartbeat = (id, hb) => {
     if (amHost()) return;
-    videoCmd({ type: hb.paused ? 'pause' : 'play', time: hb.time, dur: hb.dur });
-    vstate = { time: hb.time || 0, duration: hb.dur || vstate.duration || 0, paused: hb.paused, at: Date.now() };
+    // Gecikme telafisi: host'un konumu, mesaj bize ulaşana dek ilerledi → tek-yön ekle (oynarken)
+    const oneWay = Math.min(2, (mesh.hostRtt() / 2) / 1000);
+    const t = (hb.time || 0) + (hb.paused ? 0 : oneWay);
+    videoCmd({ type: hb.paused ? 'pause' : 'play', time: t, dur: hb.dur });
+    vstate = { time: t, duration: hb.dur || vstate.duration || 0, paused: hb.paused, at: Date.now() };
     setSync(hb.paused ? 'ok-pause' : 'ok-play');
   };
   mesh.onMediaState = (id, st) => {
@@ -464,10 +478,17 @@ function flashSync(sync) {
   clearTimeout(flashTimer);
   flashTimer = setTimeout(() => setSync(sync.type === 'pause' ? 'ok-pause' : 'ok-play'), 500);
 }
+let connText = 'hazır';
 function setConn(text) {
-  const p = $('connPill'); p.innerHTML = `<i class="pulse"></i> ${text}`;
+  connText = text;
+  const p = $('connPill');
   p.classList.remove('on', 'wait');
   if (text.trim() === 'bağlı') p.classList.add('on'); else if (/bağlan|eşler|bekleniyor/.test(text)) p.classList.add('wait');
+  renderConn();
+}
+function renderConn(ms) {
+  const ping = (ms && ms > 0) ? ` · ${Math.round(ms)}ms` : '';
+  $('connPill').innerHTML = `<i class="pulse"></i> ${connText}${ping}`;
 }
 
 // ---- Player ----
