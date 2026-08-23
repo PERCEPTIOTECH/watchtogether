@@ -208,3 +208,12 @@ input[type=text]:focus { outline: none; border-color: var(--accent); }
 .advanced summary::before { content: "▸ "; }
 .advanced[open] summary::before { content: "▾ "; }
 .advanced input { width: 100%; margin-top: 8px; font-size: 12px; }
+
+/* Marka (PERCEPT) + versiyon */
+.credit { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); }
+.pmark { color: var(--fg); display: grid; place-items: center; opacity: .85; }
+.pname { font-size: 12px; font-weight: 600; letter-spacing: 2.5px; color: var(--fg); }
+.pver { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.credit-mini { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; opacity: .7; }
+.credit-mini .pname { font-size: 9.5px; letter-spacing: 1.5px; color: var(--muted); font-weight: 600; }
+.credit-mini .appver { font-size: 9.5px; color: var(--muted); }

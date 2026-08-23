@@ -2,7 +2,8 @@
   "manifest_version": 3,
   "name": "WatchTogether — Birlikte İzle",
   "version": "0.1.0",
-  "description": "Herhangi bir video sitesinde senkron oynat/durdur/sar + sohbet + sesli & kameralı izleme (P2P).",
+  "author": "PERCEPT",
+  "description": "Herhangi bir video sitesinde senkron oynat/durdur/sar + sohbet + sesli & kameralı izleme (P2P). PERCEPT.",
   "permissions": ["scripting", "tabs", "storage"],
   "host_permissions": ["<all_urls>"],
   "background": {

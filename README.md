@@ -88,4 +88,4 @@ Tarayıcı A  ──┐                          ┌──  Tarayıcı B
 
 ## Lisans
 
-[MIT](LICENSE) © Muhammed Kızılkaya
+**PERCEPT** tarafından geliştirildi · [MIT](LICENSE) © Muhammed Kızılkaya

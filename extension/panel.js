@@ -613,3 +613,9 @@ $('leaveBtn').onclick = () => {
 $('closeBtn').onclick = () => toParent('close-panel');
 
 updateMediaButtons();
+
+// Marka + versiyon (manifest'ten)
+try {
+  const v = chrome?.runtime?.getManifest?.().version;
+  if (v) document.querySelectorAll('.appver').forEach((el) => { el.textContent = 'v' + v; });
+} catch {}
