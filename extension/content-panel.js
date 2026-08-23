@@ -113,6 +113,8 @@
     } else if (m.kind === 'next-episode') {
       const ok = clickNext();
       if (iframe) iframe.contentWindow.postMessage({ wt: true, kind: 'next-result', ok }, '*');
+    } else if (m.kind === 'chat-echo') {
+      pushChat(m);   // tam ekran sohbet katmanı için
     } else if (m.kind === 'close-panel') {
       toggle(false);
     }
@@ -145,6 +147,81 @@
   setInterval(checkUrl, 1000);
   window.addEventListener('popstate', checkUrl);
   window.addEventListener('hashchange', checkUrl);
+
+  // ---- Tam ekran sohbet katmanı ----
+  // Native tam ekranda (video'nun kendi tam ekran butonu) panel iframe'i görünmez; en azından
+  // sohbeti tam ekranın İÇİNE enjekte ediyoruz (metin frame'ler arası taşınabilir).
+  const chatBuf = [];
+  let fsOverlay = null;
+
+  function pushChat(m) {
+    chatBuf.push(m); if (chatBuf.length > 50) chatBuf.shift();
+    if (fsOverlay) { renderChatLine(m); const b = fsOverlay.querySelector('.wtfs-msgs'); b.scrollTop = b.scrollHeight; }
+  }
+  function renderChatLine(m) {
+    const box = fsOverlay && fsOverlay.querySelector('.wtfs-msgs'); if (!box) return;
+    const el = document.createElement('div');
+    if (m.sys) { el.style.cssText = 'color:#9298a3;font-size:11px;font-style:italic;text-align:center;margin:2px 0'; el.textContent = m.text; }
+    else {
+      el.style.cssText = 'margin:3px 0;font-size:13px;line-height:1.35;max-width:100%;word-break:break-word;' + (m.mine ? 'text-align:right;color:#fff' : 'color:#e9eef2');
+      if (!m.mine) { const w = document.createElement('b'); w.textContent = (m.who || '') + ': '; w.style.color = m.color || '#ff5a5f'; el.appendChild(w); }
+      el.appendChild(document.createTextNode(m.text));
+    }
+    box.appendChild(el);
+  }
+  function openFsOverlay() {
+    if (fsOverlay || !document.fullscreenElement || !readSession()) return;   // yalnızca odadayken
+    const o = document.createElement('div');
+    o.className = 'wtfs';
+    o.style.cssText = 'position:fixed;right:20px;bottom:20px;width:300px;max-height:44vh;z-index:2147483647;display:flex;flex-direction:column;background:rgba(14,14,18,.92);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.12);border-radius:14px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.5);font-family:Inter,-apple-system,sans-serif';
+    o.innerHTML =
+      '<div class="wtfs-h" style="display:flex;align-items:center;gap:8px;padding:9px 11px;cursor:move;background:rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.08)">' +
+        '<span style="width:8px;height:8px;border-radius:50%;background:#ff5a5f"></span>' +
+        '<b style="font-size:12px;color:#e9eef2;font-weight:600">Sohbet</b>' +
+        '<span style="flex:1"></span>' +
+        '<button class="wtfs-cinema" title="Sinema modu (kamera+sohbet)" style="background:none;border:1px solid rgba(255,255,255,.15);color:#c7ccd6;border-radius:7px;padding:3px 7px;font-size:11px;cursor:pointer">🎬 Sinema</button>' +
+        '<button class="wtfs-min" title="Küçült/sabitle" style="background:none;border:none;color:#9298a3;font-size:15px;cursor:pointer;padding:0 4px">–</button>' +
+      '</div>' +
+      '<div class="wtfs-msgs" style="flex:1;overflow:auto;padding:9px 11px"></div>' +
+      '<form class="wtfs-form" style="display:flex;gap:6px;padding:9px 11px;border-top:1px solid rgba(255,255,255,.08)">' +
+        '<input class="wtfs-in" placeholder="Mesaj yaz…" autocomplete="off" style="flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#edeef2;border-radius:9px;padding:8px 10px;font:inherit;font-size:12.5px;outline:none">' +
+        '<button type="submit" style="background:linear-gradient(120deg,#ff5a5f,#ff3d6b);border:none;color:#fff;border-radius:9px;padding:0 12px;font-weight:600;cursor:pointer">➤</button>' +
+      '</form>';
+    document.fullscreenElement.appendChild(o);
+    fsOverlay = o;
+    chatBuf.forEach(renderChatLine);
+    const box = o.querySelector('.wtfs-msgs'); box.scrollTop = box.scrollHeight;
+
+    // mesaj gönder
+    o.querySelector('.wtfs-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const inp = o.querySelector('.wtfs-in'); const t = inp.value.trim(); if (!t) return;
+      if (iframe) iframe.contentWindow.postMessage({ wt: true, kind: 'chat-send', text: t }, '*');
+      inp.value = '';
+    });
+    // küçült / sabitle → sadece başlık pili
+    let min = false; const minBtn = o.querySelector('.wtfs-min');
+    minBtn.addEventListener('click', () => {
+      min = !min;
+      o.querySelector('.wtfs-msgs').style.display = min ? 'none' : '';
+      o.querySelector('.wtfs-form').style.display = min ? 'none' : '';
+      o.querySelector('.wtfs-cinema').style.display = min ? 'none' : '';
+      o.style.width = min ? 'auto' : '300px';
+      minBtn.textContent = min ? '+' : '–';
+    });
+    // sinema moduna geç (kameralar için)
+    o.querySelector('.wtfs-cinema').addEventListener('click', () => {
+      try { document.exitFullscreen(); } catch {}
+      toggle(true); setTimeout(() => cinema(true), 120);
+    });
+    // sürükle
+    const h = o.querySelector('.wtfs-h'); let dx = 0, dy = 0, dragging = false;
+    h.addEventListener('mousedown', (e) => { if (e.target.tagName === 'BUTTON') return; dragging = true; const r = o.getBoundingClientRect(); dx = e.clientX - r.left; dy = e.clientY - r.top; e.preventDefault(); });
+    window.addEventListener('mousemove', (e) => { if (!dragging) return; o.style.left = (e.clientX - dx) + 'px'; o.style.top = (e.clientY - dy) + 'px'; o.style.right = 'auto'; o.style.bottom = 'auto'; });
+    window.addEventListener('mouseup', () => { dragging = false; });
+  }
+  function closeFsOverlay() { if (fsOverlay) { fsOverlay.remove(); fsOverlay = null; } }
+  document.addEventListener('fullscreenchange', () => { if (document.fullscreenElement) openFsOverlay(); else closeFsOverlay(); });
 
   // Davet linkiyle gelindiyse VEYA bu sekmede aktif bir oturum varsa (bölüm değişimi) paneli aç
   if (location.hash.includes('wt-join=') || readSession()) toggle(true);

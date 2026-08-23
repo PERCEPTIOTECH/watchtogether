@@ -55,6 +55,7 @@ window.addEventListener('message', (e) => {
   else if (m.kind === 'cinema-state') { cinemaOn = m.on; $('cinemaBtn').classList.toggle('on', cinemaOn); }
   else if (m.kind === 'tabs') populateTabs(m.tabs, m.current, m.target);
   else if (m.kind === 'next-result') { if (!m.ok) addSys('Bu sayfada "sonraki bölüm" düğmesi bulunamadı — sıradakiyle veya elle geçebilirsin'); }
+  else if (m.kind === 'chat-send') { const t = (m.text || '').trim(); if (t) { mesh.sendChat(t); addMsg('Sen', t, true, mesh.selfId); } }
 });
 toParent('request-url');
 
@@ -540,8 +541,9 @@ function addMsg(who, text, mine, id) {
   if (!mine) { const w = document.createElement('span'); w.className = 'who'; w.textContent = who; if (id) w.style.color = palOf(id); el.appendChild(w); }
   el.appendChild(linkify(text));
   $('messages').appendChild(el); $('messages').scrollTop = $('messages').scrollHeight;
+  toParent('chat-echo', { who: mine ? 'Sen' : who, text, mine: !!mine, color: id ? palOf(id) : '' });   // tam ekran katmanı için
 }
-function addSys(text) { const el = document.createElement('div'); el.className = 'msg sys'; el.textContent = text; $('messages').appendChild(el); $('messages').scrollTop = $('messages').scrollHeight; }
+function addSys(text) { const el = document.createElement('div'); el.className = 'msg sys'; el.textContent = text; $('messages').appendChild(el); $('messages').scrollTop = $('messages').scrollHeight; toParent('chat-echo', { text, sys: true }); }
 function linkify(text) {
   const frag = document.createDocumentFragment(); const re = /(https?:\/\/[^\s]+)/g; let last = 0, m;
   while ((m = re.exec(text))) {
@@ -597,6 +599,7 @@ $('nextEpBtn').onclick = () => {
 };
 $('cinemaBtn').onclick = () => toParent('cinema');
 $('camToggle').onclick = () => $('camSection').classList.toggle('collapsed');
+$('chatToggle').onclick = () => document.querySelector('.chat')?.classList.toggle('collapsed');
 
 $('micBtn').onclick = () => {
   micOn = !micOn; mesh.localStream?.getAudioTracks().forEach((t) => t.enabled = micOn);
