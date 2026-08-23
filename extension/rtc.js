@@ -141,7 +141,11 @@ export class Mesh {
         if (msg.host !== undefined) this._setHost(msg.host);
         this._ensurePeer(msg.peer, false);
       } else if (msg.type === 'peer-left') {
-        this._dropPeer(msg.peer);
+        // Signaling'de ayrıldı — ama P2P (video/ses/kamera) HÂLÂ canlıysa DÜŞÜRME.
+        // Render ücretsiz ws'i ara sıra kopuyor; signaling hıçkırığı canlı görüşmeyi öldürmesin.
+        // Gerçekten ayrıldıysa ICE zaten kısa sürede 'failed' olur ve orada temizlenir.
+        const st = this.peers.get(msg.peer);
+        if (!st || !st.pc || st.pc.connectionState !== 'connected') this._dropPeer(msg.peer);
       } else if (msg.type === 'host') {
         this._setHost(msg.peer);
       } else if (msg.type === 'host-token') {

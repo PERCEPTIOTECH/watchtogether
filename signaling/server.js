@@ -18,8 +18,19 @@ function broadcast(R, msg) { for (const [, w] of R.peers) send(w, msg); }
 const server = http.createServer((req, res) => { res.writeHead(200); res.end('WatchTogether signaling OK\n'); });
 const wss = new WebSocketServer({ server });
 
+// Keepalive: proxy/idle ws kopmalarını önle + ölü bağlantıları temizle (her 30sn)
+const keepAlive = setInterval(() => {
+  wss.clients.forEach((ws) => {
+    if (ws.isAlive === false) { try { ws.terminate(); } catch {} return; }
+    ws.isAlive = false; try { ws.ping(); } catch {}
+  });
+}, 30000);
+wss.on('close', () => clearInterval(keepAlive));
+
 wss.on('connection', (ws) => {
   let roomId = null, peerId = null;
+  ws.isAlive = true;
+  ws.on('pong', () => { ws.isAlive = true; });
 
   ws.on('message', (raw) => {
     let msg; try { msg = JSON.parse(raw); } catch { return; }
