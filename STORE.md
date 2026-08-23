@@ -62,29 +62,44 @@ Kullanıcıların arkadaşlarıyla herhangi bir video sitesindeki videoyu senkro
 gerçek zamanlı (P2P) sesli/kameralı/yazılı iletişim kurmasını sağlamak.
 ```
 
-## 5) İzin gerekçeleri (Permission justifications)
+## 5) İzin gerekçeleri (her kutuya AYNEN yapıştır)
 
-- **host_permissions `<all_urls>` + içerik betikleri:** Eklentinin herhangi bir video
-  sitesindeki `<video>` öğesini bulup senkron kontrol edebilmesi ve paneli gösterebilmesi için
-  tüm sitelerde çalışması gerekir.
-- **`tabs`:** "Video kaynağı" özelliğinde açık sekmeleri listelemek ve senkron komutlarını
-  doğru sekmeye yönlendirmek için.
-- **`scripting`:** Panel ve video-kontrol betiklerini sayfaya enjekte etmek için.
-- **`storage`:** Kullanıcının adını ve (isteğe bağlı) signaling sunucu adresini yerelde
-  hatırlamak için.
-- **Kamera/Mikrofon (getUserMedia):** Yalnızca kullanıcı bir odaya katılıp açıkça izin
-  verdiğinde; sesli/kameralı görüşme için. İçerik P2P akar, saklanmaz.
+**Ana makine izni (host permission / `<all_urls>`):**
+```
+Eklenti, kullanıcının seçtiği herhangi bir video sitesinde çalışmalıdır. Sayfadaki <video> öğesini bulup oynatmayı senkronlamak ve birlikte-izleme panelini göstermek için tüm sitelere erişim gerekir; sabit bir site listesiyle sınırlanamaz.
+```
+**`scripting`:**
+```
+Birlikte-izleme panelini ve video kontrol betiğini aktif sekmeye enjekte etmek için gereklidir.
+```
+**`storage`:**
+```
+Kullanıcının görünen adını ve isteğe bağlı signaling sunucu adresini yalnızca yerel olarak (chrome.storage) hatırlamak için. Hiçbir sunucuya gönderilmez.
+```
+**`tabs`:**
+```
+"Video kaynağı" özelliğinde açık sekmeleri listelemek ve senkron komutlarını doğru sekmeye yönlendirmek için gereklidir.
+```
 
-## 6) Veri kullanımı beyanı (Privacy practices sekmesi)
+## 5b) Uzak kod (Remote code)
 
-Formda şunları işaretle:
-- Toplanan veri türleri → **Personal communications** (sesli/görüntülü/yazılı sohbet) ve
-  **Web history** (senkron için paylaşılan sayfa URL'i). Not: bunlar **P2P** iletilir,
-  geliştiricinin sunucusunda **saklanmaz**.
-- **Kimliği doğrulanabilir bilgi satılmıyor.** ✅
-- **Veri, eklentinin tek amacı dışında kullanılmıyor.** ✅
-- **Veri, kredi düzeltme/borç toplama için kullanılmıyor.** ✅
-- Üç zorunlu sertifikasyon kutusunu işaretle.
+Seçim: **"Hayır, uzak kod kullanmıyorum"**. Gerekçe istenirse:
+```
+Eklenti hiçbir uzak kod çalıştırmaz. Tüm JavaScript ve yazı tipleri (Inter) eklenti paketinde yerel olarak bulunur. Sunucu bağlantısı yalnızca WebRTC el sıkışması (signaling) içindir; uzaktan kod indirilmez veya çalıştırılmaz.
+```
+
+## 6) Veri kullanımı + ZORUNLU ONAY (Privacy practices sekmesi)
+
+**a) Hangi veriyi topluyorsunuz?** → **Personal communications** (sesli/görüntülü/yazılı sohbet).
+Not: bu veri **P2P** iletilir, geliştiricinin sunucusunda **saklanmaz**.
+
+**b) Sekmenin EN ALTINDA "Veri kullanımı" sertifikasyonu — 3 kutuyu da İŞARETLE (zorunlu):**
+- ☑ Kullanıcı verilerini yetkisiz taraflara satmıyorum.
+- ☑ Verileri, öğenin tek amacıyla ilgisiz amaçlarla kullanmıyor/aktarmıyorum.
+- ☑ Verileri kredi değerliliği veya borç toplama için kullanmıyor/aktarmıyorum.
+
+> "…veri kullanımınızın politikalara uygun olduğunu onaylamanız gerekir" hatası, bu **3 onay
+> kutusu işaretlenmediği** için çıkar. Üçünü de işaretle → **Taslağı kaydet**.
 
 ## 7) Görseller
 
