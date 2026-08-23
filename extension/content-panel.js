@@ -11,6 +11,7 @@
   const PANEL_W = 400;
   let host = null, iframe = null, open = false;
   let cinemaOn = false, backdrop = null, cinemaEl = null, cinemaPrev = '';
+  let hostStylePrev = '', htmlOverflowPrev = '', escHandler = null, exitBtn = null;
 
   function build() {
     host = document.createElement('div');
@@ -51,27 +52,59 @@
     if (on === cinemaOn) return;
     cinemaOn = on;
     if (on) {
-      // Video üst-belgede mi (video), yoksa çapraz-origin iframe içinde mi?
+      if (!host) build();
+      toggle(true);                                   // panel (kameralar) açık olsun
       cinemaEl = biggestBy('video') || biggestBy('iframe');
+
+      // Gövde kaydırmayı kilitle (tam ekran hissi)
+      htmlOverflowPrev = document.documentElement.style.overflow;
+      document.documentElement.style.overflow = 'hidden';
+
+      // Tam siyah arka fon
       backdrop = document.createElement('div');
-      Object.assign(backdrop.style, {
-        position: 'fixed', inset: '0', background: 'rgba(3,4,10,.94)', zIndex: '2147483000',
-        transition: 'opacity .25s', opacity: '0',
-      });
+      Object.assign(backdrop.style, { position: 'fixed', inset: '0', background: '#000', zIndex: '2147483000', opacity: '0', transition: 'opacity .3s' });
       document.documentElement.appendChild(backdrop);
       requestAnimationFrame(() => { backdrop.style.opacity = '1'; });
+
+      // Videoyu TÜM ekrana yay (letterbox siyah)
       if (cinemaEl) {
         cinemaPrev = cinemaEl.getAttribute('style') || '';
         Object.assign(cinemaEl.style, {
-          position: 'fixed', top: '0', left: '0',
-          width: `calc(100vw - ${open ? PANEL_W : 0}px)`, height: '100vh',
-          zIndex: '2147483200', background: '#000', objectFit: 'contain', margin: '0',
-          maxWidth: 'none', maxHeight: 'none',
+          position: 'fixed', top: '0', left: '0', width: '100vw', height: '100vh',
+          zIndex: '2147483100', background: '#000', objectFit: 'contain', margin: '0',
+          maxWidth: 'none', maxHeight: 'none', borderRadius: '0',
         });
       }
+
+      // Paneli yüzen karta çevir (video üstünde, kameralar görünür)
+      hostStylePrev = host.getAttribute('style') || '';
+      Object.assign(host.style, {
+        top: '14px', right: '14px', bottom: '14px', left: 'auto', height: 'auto', width: '372px',
+        borderRadius: '16px', overflow: 'hidden', zIndex: '2147483200',
+        boxShadow: '0 24px 70px rgba(0,0,0,.6)', transform: 'none', transition: 'none',
+      });
+
+      // Çıkış butonu (sol üst) + ESC
+      exitBtn = document.createElement('button');
+      exitBtn.textContent = '✕  Sinemadan çık  ·  ESC';
+      Object.assign(exitBtn.style, {
+        position: 'fixed', top: '16px', left: '16px', zIndex: '2147483300',
+        background: 'rgba(20,20,26,.75)', color: '#e9eef2', border: '1px solid rgba(255,255,255,.15)',
+        borderRadius: '10px', padding: '8px 12px', font: '13px Inter,-apple-system,sans-serif',
+        cursor: 'pointer', backdropFilter: 'blur(6px)', opacity: '0', transition: 'opacity .3s',
+      });
+      exitBtn.addEventListener('click', () => cinema(false));
+      document.documentElement.appendChild(exitBtn);
+      requestAnimationFrame(() => { exitBtn.style.opacity = '.9'; });
+      escHandler = (e) => { if (e.key === 'Escape') cinema(false); };
+      window.addEventListener('keydown', escHandler, true);
     } else {
       if (backdrop) { backdrop.remove(); backdrop = null; }
       if (cinemaEl) { cinemaEl.setAttribute('style', cinemaPrev); cinemaEl = null; }
+      if (exitBtn) { exitBtn.remove(); exitBtn = null; }
+      document.documentElement.style.overflow = htmlOverflowPrev;
+      if (host) host.setAttribute('style', hostStylePrev);
+      if (escHandler) { window.removeEventListener('keydown', escHandler, true); escHandler = null; }
     }
     if (iframe) iframe.contentWindow.postMessage({ wt: true, kind: 'cinema-state', on: cinemaOn }, '*');
   }
