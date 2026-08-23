@@ -38,7 +38,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["panel.html", "panel.js", "panel.css", "rtc.js"],
+      "resources": ["panel.html", "panel.js", "panel.css", "rtc.js", "util.js"],
       "matches": ["<all_urls>"]
     }
   ]

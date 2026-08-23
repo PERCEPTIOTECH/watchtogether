@@ -172,7 +172,7 @@ export class Mesh {
 
     pc.onconnectionstatechange = () => {
       const s = pc.connectionState;
-      if (s === 'connected') { state.negotiated = true; state.iceRetried = false; this.onStatus('bağlı'); return; }
+      if (s === 'connected') { state.negotiated = true; state.connected = true; state.iceRetried = false; this.onStatus('bağlı'); return; }
       if (s === 'closed') { this._dropPeer(peerId); return; }
       if (s === 'failed') {
         // Düşürmeden önce ICE restart dene (ağ yolu değişmiş olabilir)
@@ -287,9 +287,10 @@ export class Mesh {
   _dropPeer(peerId) {
     const state = this.peers.get(peerId);
     if (!state) return;
+    const connected = !!state.connected;
     try { state.pc.close(); } catch {}
     this.peers.delete(peerId);
-    this.onLeave(peerId);
+    this.onLeave(peerId, { connected });   // connected:false → hiç bağlanamadı (ağ/TURN)
   }
 
   _send(dc, obj) {

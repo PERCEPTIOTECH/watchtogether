@@ -1,5 +1,6 @@
 // WatchTogether — panel UI (v6: profesyonel arayüz + kontrol yetkisi).
 import { Mesh } from './rtc.js';
+import { basePage, shortUrl, initials, fmt, hashStr } from './util.js';
 
 const $ = (id) => document.getElementById(id);
 const mesh = new Mesh();
@@ -10,19 +11,16 @@ const roster = new Map();               // key ('self'|peerId) -> {name, mic, ca
 const grantedNames = new Set();         // host: kontrol verilen İSİMLER (F5 sonrası id değişse de korunur)
 let queue = [];
 let vstate = { time: 0, duration: 0, paused: true, at: 0 };
-let seeking = false, loopTimer = null;
+let seeking = false, loopTimer = null, hasVideo = false, noVideoTimer = null;
 
-const basePage = (u) => (u || '').split('#')[0];
 const realId = (key) => (key === 'self' ? mesh.selfId : key);
 // Otorite artık sunucu-belirli: host = mesh.hostId, kontrol = mesh.controllers
 const canControl = () => mesh.iCanControl();
 const amHost = () => mesh.amHost();
 
 // Düz renk avatar paleti (profesyonel, tek renk)
-const PAL = ['#6470ff', '#3ecf8e', '#e6a54b', '#f26d6d', '#a78bfa', '#38bdf8', '#f472b6', '#22b8cf'];
-const hash = (s) => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return Math.abs(h); };
-const palOf = (id) => PAL[hash(id) % PAL.length];
-const initials = (n) => (n || '?').trim().slice(0, 2).toUpperCase();
+const PAL = ['#1ba8ff', '#22e0c8', '#2ee6a0', '#ffb020', '#a78bfa', '#ff5470', '#38bdf8', '#f472b6'];
+const palOf = (id) => PAL[hashStr(id) % PAL.length];
 
 // SVG ikonlar (stroke, sade)
 const svg = (p, s, fill) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}">${fill ? `<path d="${p}" fill="currentColor"/>` : `<path d="${p}" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`}</svg>`;
@@ -175,6 +173,7 @@ function enterJoinMode(code) {
 // ---- Video senkron çekirdeği ----
 function handleVideoEvent(ev) {
   if (ev.type === 'none') return;
+  hasVideo = true; clearTimeout(noVideoTimer);          // gerçek video bulundu
   const paused = ev.type === 'pause';
   vstate = { time: ev.time || 0, duration: ev.dur || vstate.duration || 0, paused, at: Date.now() };
   setSync(paused ? 'ok-pause' : 'ok-play');
@@ -245,6 +244,9 @@ async function startRoom(room, opts = {}) {
   $('room').classList.remove('hidden');
   $('roomCode').textContent = room;
   renderUsers(); setSync('wait'); renderQueue(); updateControlUI(); requestTabs();
+  hasVideo = false;                                     // video var mı? 6sn içinde rapor gelmezse uyar
+  clearTimeout(noVideoTimer);
+  noVideoTimer = setTimeout(() => { if (joined && !hasVideo) setSync('err-novideo'); }, 6000);
   toParent('session-active', { on: true, room, name, creator: isCreator, token: mesh.hostToken });
 
   if (!opts.silent) {
@@ -303,7 +305,12 @@ function wireMesh() {
     renderUsers(); renderName(id, name);
     if (amHost()) { mesh.sendSource(basePage(pageUrl)); recomputeControllers(); }   // isme göre yetkiyi yeniden uygula
   };
-  mesh.onLeave = (id) => { roster.delete(id); mesh.controllers.delete(id); removeTile(id); analysers.delete(id); renderUsers(); addSys('Bir katılımcı ayrıldı'); };
+  mesh.onLeave = (id, info) => {
+    const nm = roster.get(id)?.name;
+    roster.delete(id); mesh.controllers.delete(id); removeTile(id); analysers.delete(id); renderUsers();
+    if (info && info.connected === false) addSys(`⚠️ ${nm || 'Bir kullanıcı'} ile bağlantı kurulamadı — ağ/güvenlik duvarı engelliyor olabilir`);
+    else addSys(`${nm || 'Bir katılımcı'} ayrıldı`);
+  };
   mesh.onStream = (id, stream) => { addTile(id, roster.get(id)?.name || 'Katılımcı', stream, false); watchSpeaking(id, stream); };
   mesh.onChat = (id, text) => addMsg(roster.get(id)?.name || 'Katılımcı', text, false, realId(id));
   mesh.onSync = (id, sync) => {
@@ -315,7 +322,7 @@ function wireMesh() {
   };
   mesh.onHeartbeat = (id, hb) => {
     if (amHost()) return;
-    videoCmd({ type: hb.paused ? 'pause' : 'play', time: hb.time });
+    videoCmd({ type: hb.paused ? 'pause' : 'play', time: hb.time, dur: hb.dur });
     vstate = { time: hb.time || 0, duration: hb.dur || vstate.duration || 0, paused: hb.paused, at: Date.now() };
     setSync(hb.paused ? 'ok-pause' : 'ok-play');
   };
@@ -443,13 +450,13 @@ function removeTile(id) { document.querySelector(`.tile[data-id="${CSS.escape(id
 function renderName(id, name) { const t = document.querySelector(`.tile[data-id="${CSS.escape(id)}"] .name`); if (t) t.textContent = name; }
 
 // ---- Senkron durumu ----
-function fmt(sec) { if (!isFinite(sec) || sec < 0) sec = 0; const m = Math.floor(sec / 60), s = Math.floor(sec % 60); return `${m}:${String(s).padStart(2, '0')}`; }
 function setSync(kind) {
   const b = $('syncBadge'), t = $('syncText');
   b.classList.remove('ok', 'warn', 'err');
   if (kind === 'wait') { t.textContent = 'eşitleniyor…'; b.classList.add('warn'); }
   else if (kind === 'ok-play') { t.textContent = 'Eşitlendi · oynatılıyor'; b.classList.add('ok'); }
   else if (kind === 'ok-pause') { t.textContent = 'Eşitlendi · duraklatıldı'; b.classList.add('ok'); }
+  else if (kind === 'err-novideo') { t.textContent = 'Bu sekmede video bulunamadı'; b.classList.add('err'); }
 }
 let flashTimer = null;
 function flashSync(sync) {
@@ -535,7 +542,6 @@ function addToQueue() {
   queue.push({ url, label: shortUrl(url) });
   $('queueInput').value = ''; renderQueue(); if (joined) mesh.sendQueue(queue);
 }
-function shortUrl(u) { try { const x = new URL(u); return x.hostname.replace('www.', '') + (x.pathname.length > 1 ? ' · ' + x.pathname.split('/').filter(Boolean).slice(-1)[0] : ''); } catch { return u; } }
 function renderQueue() {
   const list = $('queueList'); list.innerHTML = '';
   if (!queue.length) { list.innerHTML = `<div class="qempty">Sonraki bölüm/film linkini ekleyin</div>`; return; }
@@ -604,7 +610,7 @@ async function doInvite() {
 $('inviteBtn').onclick = doInvite;
 $('copyLink').onclick = doInvite;
 $('leaveBtn').onclick = () => {
-  mesh.leave(); joined = false; clearInterval(loopTimer); if (cinemaOn) toParent('cinema', { on: false });
+  mesh.leave(); joined = false; clearInterval(loopTimer); clearTimeout(noVideoTimer); if (cinemaOn) toParent('cinema', { on: false });
   toParent('session-active', { on: false });
   roster.clear(); mesh.controllers.clear(); grantedNames.clear(); mesh.hostId = null; mesh.hostToken = null; analysers.clear(); queue = [];
   $('videos').innerHTML = ''; $('messages').innerHTML = ''; $('userList').innerHTML = '';

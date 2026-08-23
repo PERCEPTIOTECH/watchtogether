@@ -88,7 +88,9 @@
     applyingRemote = true;
     try {
       if (typeof cmd.time === 'number' && Math.abs(v.currentTime - cmd.time) > SEEK_EPS) {
-        v.currentTime = cmd.time;
+        // Süre çok farklıysa (reklam ya da farklı içerik) konumu ZORLAMA → yanlış sarma olmasın
+        const durMismatch = cmd.dur && v.duration && isFinite(v.duration) && Math.abs(cmd.dur - v.duration) > 5;
+        if (!durMismatch) v.currentTime = cmd.time;
       }
       if (typeof cmd.rate === 'number' && Math.abs(v.playbackRate - cmd.rate) > 0.01) {
         v.playbackRate = cmd.rate;
