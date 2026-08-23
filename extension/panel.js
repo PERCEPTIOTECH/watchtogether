@@ -315,8 +315,10 @@ function wireMesh() {
   mesh.onLeave = (id, info) => {
     const nm = roster.get(id)?.name;
     roster.delete(id); mesh.controllers.delete(id); removeTile(id); analysers.delete(id); renderUsers();
-    if (info && info.connected === false) addSys(`⚠️ ${nm || 'Bir kullanıcı'} ile bağlantı kurulamadı — ağ/güvenlik duvarı engelliyor olabilir`);
-    else addSys(`${nm || 'Bir katılımcı'} ayrıldı`);
+    if (!nm) return;                                                  // isimsiz = hiç el sıkışmamış hayalet → sessiz
+    for (const [k, u] of roster) if (k !== 'self' && u.name === nm) return;   // aynı kişi başka id ile HÂLÂ bağlı → sessiz (yanlış alarm yok)
+    if (info && info.connected === false) addSys(`⚠️ ${nm} ile bağlantı kurulamadı — ağ/güvenlik duvarı engelliyor olabilir`);
+    else addSys(`${nm} ayrıldı`);
   };
   mesh.onStream = (id, stream) => { addTile(id, roster.get(id)?.name || 'Katılımcı', stream, false); watchSpeaking(id, stream); };
   mesh.onChat = (id, text) => addMsg(roster.get(id)?.name || 'Katılımcı', text, false, realId(id));

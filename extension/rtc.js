@@ -126,10 +126,14 @@ export class Mesh {
       const msg = JSON.parse(ev.data);
       if (msg.type === 'peers') {
         if (msg.host !== undefined) this._setHost(msg.host);
-        // Yeniden bağlanmada: sunucu listesinde OLMAYAN yerel eşleri düşür (kesinti sırasında ayrılmışlar)
+        // Yeniden bağlanmada: sunucu listesinde OLMAYAN eşleri düşür — AMA hâlâ P2P bağlıysa
+        // dokunma (sunucu anlık listesi eksik olabilir → yanlış "düştü" alarmı olmasın)
         if (this._joinedOnce) {
           const alive = new Set(msg.peers);
-          for (const id of [...this.peers.keys()]) if (!alive.has(id)) this._dropPeer(id);
+          for (const id of [...this.peers.keys()]) {
+            const st = this.peers.get(id);
+            if (!alive.has(id) && (!st.pc || st.pc.connectionState !== 'connected')) this._dropPeer(id);
+          }
         }
         this._joinedOnce = true;
         for (const pid of msg.peers) this._ensurePeer(pid, true);
