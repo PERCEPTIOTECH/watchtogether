@@ -34,7 +34,7 @@ kimsenin sunucusundan geçmez, doğrudan aranızda akar.
 
 > Eklenti henüz mağazada değil, ikiniz de aynı kurulumu yapın. Chrome / Brave / Edge. Telefon desteklenmiyor.
 
-1. **İndir:** [bu repo](https://github.com/muhammed-kizilkaya/watchtogether) → yeşil **`< > Code`** → **Download ZIP**
+1. **İndir:** [bu repo](https://github.com/PERCEPTIOTECH/watchtogether) → yeşil **`< > Code`** → **Download ZIP**
 2. **Aç:** inen ZIP'e çift tıkla → `watchtogether-main` klasörü çıkar
 3. Tarayıcıda **`chrome://extensions`** (Brave: `brave://extensions`) aç
 4. Sağ üstten **Developer mode / Geliştirici modu**'nu aç

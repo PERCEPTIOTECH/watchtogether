@@ -14,8 +14,8 @@ Yüklenecek paket: **`watchtogether-store-v0.1.0.zip`** (bu repoda hazır).
 | **Ad** | WatchTogether — Birlikte İzle |
 | **Kategori** | İletişim / Sosyal (Social & Communication) |
 | **Dil** | Türkçe (birincil) |
-| **Gizlilik Politikası URL** | https://github.com/muhammed-kizilkaya/watchtogether/blob/main/PRIVACY.md |
-| **Web sitesi (ops.)** | https://github.com/muhammed-kizilkaya/watchtogether |
+| **Gizlilik Politikası URL** | https://github.com/PERCEPTIOTECH/watchtogether/blob/main/PRIVACY.md |
+| **Web sitesi (ops.)** | https://github.com/PERCEPTIOTECH/watchtogether |
 
 ## 2) Kısa açıklama (Summary — en fazla 132 karakter)
 

@@ -36,7 +36,7 @@ yalnızca "kim kiminle bağlanacak" bilgisi geçici olarak röle edilir ve sakla
 - **`storage`:** Adınızı ve sunucu ayarını yerel olarak hatırlamak için.
 
 ### İletişim
-Sorular için: geliştirici PERCEPT · GitHub: github.com/muhammed-kizilkaya/watchtogether
+Sorular için: geliştirici PERCEPT · GitHub: github.com/PERCEPTIOTECH/watchtogether
 
 ---
 
