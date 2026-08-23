@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="800" viewBox="0 0 1280 800" font-family="'Helvetica Neue',Arial,sans-serif">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff5a5f"/><stop offset="1" stop-color="#ff3d6b"/></linearGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#101014"/><stop offset="1" stop-color="#0b0b0f"/></linearGradient>
+    <linearGradient id="c1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2a2130"/><stop offset="1" stop-color="#0e0f16"/></linearGradient>
+    <linearGradient id="c2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1d2a33"/><stop offset="1" stop-color="#0e0f16"/></linearGradient>
+    <linearGradient id="c3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#122a26"/><stop offset="1" stop-color="#0e0f16"/></linearGradient>
+  </defs>
+  <rect width="1280" height="800" fill="url(#bg)"/>
+  <rect width="1280" height="6" fill="url(#g)"/>
+
+  <text x="640" y="120" fill="#f4f5f8" font-size="46" font-weight="700" letter-spacing="-1" text-anchor="middle">Sesli, kameralı — anında tepki ver</text>
+  <text x="640" y="162" fill="#9298a3" font-size="21" text-anchor="middle">Konuşanın etrafında canlı halka, renkli isimlerle sohbet — hepsi P2P, uçtan uca</text>
+
+  <!-- 3 camera tiles -->
+  <g transform="translate(190,230)">
+    <rect width="290" height="290" rx="22" fill="url(#c1)" stroke="#2ee6a0" stroke-width="3"/>
+    <circle cx="145" cy="120" r="52" fill="url(#g)"/><text x="145" y="135" fill="#fff" font-size="38" font-weight="700" text-anchor="middle">SE</text>
+    <rect x="16" y="250" width="120" height="26" rx="9" fill="rgba(5,6,10,.6)"/><text x="30" y="268" fill="#edeef2" font-size="14">Sen · konuşuyor</text>
+  </g>
+  <g transform="translate(495,230)">
+    <rect width="290" height="290" rx="22" fill="url(#c2)" stroke="rgba(255,255,255,.1)"/>
+    <circle cx="145" cy="120" r="52" fill="#38bdf8"/><text x="145" y="135" fill="#04121a" font-size="38" font-weight="700" text-anchor="middle">KA</text>
+    <rect x="16" y="250" width="80" height="26" rx="9" fill="rgba(5,6,10,.6)"/><text x="30" y="268" fill="#edeef2" font-size="14">Kanka</text>
+  </g>
+  <g transform="translate(800,230)">
+    <rect width="290" height="290" rx="22" fill="url(#c3)" stroke="rgba(255,255,255,.1)"/>
+    <circle cx="145" cy="120" r="52" fill="#a78bfa"/><text x="145" y="135" fill="#160c2e" font-size="38" font-weight="700" text-anchor="middle">EF</text>
+    <rect x="16" y="250" width="70" height="26" rx="9" fill="rgba(5,6,10,.6)"/><text x="30" y="268" fill="#edeef2" font-size="14">Efe</text>
+  </g>
+
+  <!-- chat bubbles -->
+  <g transform="translate(190,560)">
+    <rect width="360" height="46" rx="16" fill="#22232b"/><text x="22" y="30" fill="#c7ccd6" font-size="17">şu sahne efsane ya 🔥</text>
+    <rect x="540" y="70" width="360" height="46" rx="16" fill="url(#g)"/><text x="880" y="100" fill="#fff" font-size="17" text-anchor="end">değil mi, geri sarayım mı</text>
+    <rect y="140" width="300" height="46" rx="16" fill="#22232b"/><text x="22" y="170" fill="#c7ccd6" font-size="17">sarma sarma, dur dur</text>
+  </g>
+</svg>
